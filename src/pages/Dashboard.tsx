@@ -1,114 +1,158 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
-import { getDocuments, type SignedDocument } from '@/lib/documents';
+import { getDocuments, getStats, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
+import DashboardStats from '@/components/DashboardStats';
+import DocumentHistoryTable from '@/components/DocumentHistoryTable';
 import { Button } from '@/components/ui/button';
-import { PenTool, FileText, Calendar, Download, Plus } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Plus, Bell, FileText, BarChart3, History } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
+
+type Tab = 'overview' | 'history';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getCurrentUser();
   const [docs, setDocs] = useState<SignedDocument[]>([]);
+  const [stats, setStats] = useState(getStats());
+  const [tab, setTab] = useState<Tab>('overview');
+  const [notifications] = useState([
+    { id: '1', text: 'Bienvenue sur SENSTOCK !', time: 'Maintenant' },
+  ]);
+  const [showNotifs, setShowNotifs] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
     setDocs(getDocuments(user.email));
+    setStats(getStats());
   }, []);
 
   if (!user) return null;
 
   const name = extractName(user.email);
 
+  const handleDownload = (doc: SignedDocument) => {
+    if (doc.signedPdfUrl) {
+      const a = document.createElement('a');
+      a.href = doc.signedPdfUrl;
+      a.download = `signé_${doc.fileName}`;
+      a.click();
+    } else {
+      toast.info('Le fichier signé n\'est plus disponible dans cette session');
+    }
+  };
+
+  const handlePreview = (doc: SignedDocument) => {
+    if (doc.signedPdfUrl) {
+      window.open(doc.signedPdfUrl, '_blank');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-secondary/30">
       <AppHeader />
-      <main className="container py-8 space-y-8">
-        {/* Welcome */}
+      <main className="container py-8 space-y-6">
+        {/* Welcome Header */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
         >
           <div>
-            <h1 className="text-2xl font-bold">Bonjour, {name} 👋</h1>
-            <p className="text-muted-foreground">Gérez vos documents et signatures électroniques</p>
+            <h1 className="text-2xl font-bold">
+              Bonjour, <span className="text-gradient">{name}</span> 👋
+            </h1>
+            <p className="text-muted-foreground text-sm">Votre espace de signature électronique SENSTOCK</p>
           </div>
-          <Button onClick={() => navigate('/sign')} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Nouvelle signature
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Notifications */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowNotifs(!showNotifs)}
+                className="relative"
+              >
+                <Bell className="h-4 w-4" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+                    {notifications.length}
+                  </span>
+                )}
+              </Button>
+              <AnimatePresence>
+                {showNotifs && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                    className="absolute right-0 mt-2 w-72 glass rounded-xl p-3 z-50 shadow-2xl"
+                  >
+                    <p className="text-xs font-semibold mb-2">Notifications</p>
+                    {notifications.map(n => (
+                      <div key={n.id} className="flex items-start gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
+                        <div className="h-2 w-2 rounded-full bg-primary mt-1.5 shrink-0" />
+                        <div>
+                          <p className="text-xs">{n.text}</p>
+                          <p className="text-[10px] text-muted-foreground">{n.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            <Button onClick={() => navigate('/sign')} className="gap-2 shadow-lg">
+              <Plus className="h-4 w-4" />
+              Nouvelle signature
+            </Button>
+          </div>
         </motion.div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Tab Switcher */}
+        <div className="flex gap-1 bg-muted/50 p-1 rounded-xl w-fit">
           {[
-            { label: 'Documents signés', value: docs.length, icon: FileText },
-            { label: 'Ce mois-ci', value: docs.filter(d => d.signedAt.startsWith(new Date().toISOString().substring(0, 7))).length, icon: Calendar },
-            { label: 'Total pages', value: docs.reduce((a, d) => a + d.pageCount, 0), icon: PenTool },
-          ].map((stat, i) => (
-            <motion.div
-              key={stat.label}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className="bg-card rounded-xl p-5 border shadow-sm"
+            { key: 'overview' as Tab, label: 'Vue d\'ensemble', icon: BarChart3 },
+            { key: 'history' as Tab, label: 'Historique', icon: History },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                tab === t.key
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
             >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-accent flex items-center justify-center">
-                  <stat.icon className="h-5 w-5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold">{stat.value}</p>
-                  <p className="text-xs text-muted-foreground">{stat.label}</p>
-                </div>
-              </div>
-            </motion.div>
+              <t.icon className="h-4 w-4" />
+              {t.label}
+            </button>
           ))}
         </div>
 
-        {/* Document History */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4">Historique des signatures</h2>
-          {docs.length === 0 ? (
-            <div className="bg-card rounded-xl border p-12 text-center">
-              <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
-              <p className="text-muted-foreground">Aucun document signé</p>
-              <Button variant="outline" className="mt-4 gap-2" onClick={() => navigate('/sign')}>
-                <PenTool className="h-4 w-4" />
-                Signer votre premier document
-              </Button>
-            </div>
-          ) : (
-            <div className="grid gap-3">
-              {docs.map((doc, i) => (
-                <motion.div
-                  key={doc.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: i * 0.05 }}
-                  className="bg-card rounded-xl border p-4 flex items-center justify-between hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-lg bg-accent/60 flex items-center justify-center shrink-0">
-                      <FileText className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-sm">{doc.fileName}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(doc.signedAt).toLocaleDateString('fr-FR')} · {doc.pageCount} pages · Position: {doc.signaturePosition}
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="icon" title="Télécharger">
-                    <Download className="h-4 w-4" />
-                  </Button>
-                </motion.div>
-              ))}
-            </div>
+        {/* Content */}
+        <AnimatePresence mode="wait">
+          {tab === 'overview' && (
+            <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <DashboardStats stats={stats} />
+            </motion.div>
           )}
-        </div>
+          {tab === 'history' && (
+            <motion.div key="history" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                <FileText className="h-5 w-5 text-primary" />
+                Liste des signatures
+              </h2>
+              <DocumentHistoryTable
+                documents={docs}
+                onDownload={handleDownload}
+                onPreview={handlePreview}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
