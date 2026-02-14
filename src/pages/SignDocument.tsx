@@ -36,8 +36,9 @@ export default function SignDocument() {
   const [signedFileName, setSignedFileName] = useState('');
   const [docLabel, setDocLabel] = useState('');
 
-  // For canvas preview - generate a simple placeholder
   const [pagePreviewUrl, setPagePreviewUrl] = useState('');
+  const [pdfPageImages, setPdfPageImages] = useState<string[]>([]);
+  const [selectedPageIndex, setSelectedPageIndex] = useState(0);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
@@ -48,6 +49,25 @@ export default function SignDocument() {
 
   if (!user) return null;
   const signerName = extractName(user.email);
+
+  const renderPdfPages = async (bytes: ArrayBuffer) => {
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs`;
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(bytes) }).promise;
+    const images: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const viewport = page.getViewport({ scale: 1.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      images.push(canvas.toDataURL('image/png'));
+    }
+    setPdfPageImages(images);
+    setSelectedPageIndex(0);
+  };
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,6 +80,7 @@ export default function SignDocument() {
     setPdfBytes(bytes);
     setPdfUrl(URL.createObjectURL(file));
     setDocLabel(file.name.replace('.pdf', ''));
+    renderPdfPages(bytes);
     setStep('read');
   };
 
@@ -308,8 +329,25 @@ export default function SignDocument() {
                   Déplacez le cachet et le nom du signataire où vous souhaitez sur le document. Ajustez la taille avec le curseur.
                 </p>
 
+                {/* Page selector thumbnails */}
+                {pdfPageImages.length > 1 && (
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                    {pdfPageImages.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedPageIndex(i)}
+                        className={`flex-shrink-0 w-16 h-20 rounded-lg border-2 overflow-hidden transition-all ${
+                          selectedPageIndex === i ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'
+                        }`}
+                      >
+                        <img src={img} alt={`Page ${i + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+
                 <SignatureCanvas
-                  pdfPageImage={pdfUrl ? '' : ''}
+                  pdfPageImage={pdfPageImages[selectedPageIndex] || ''}
                   stampPreview={stampPreview}
                   signerName={signerName}
                   onPositionChange={setCustomPos}
