@@ -1,12 +1,15 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, extractName, logout } from '@/lib/auth';
-import { LogOut, FileText, Shield, PenTool } from 'lucide-react';
+import { LogOut, FileText, Shield, PenTool, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTheme } from '@/components/ThemeProvider';
+import { motion } from 'framer-motion';
 
 export default function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getCurrentUser();
+  const { theme, toggleTheme } = useTheme();
 
   if (!user) return null;
 
@@ -51,7 +54,26 @@ export default function AppHeader() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          {/* Dark mode toggle */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleTheme}
+            className="relative overflow-hidden"
+            title={theme === 'dark' ? 'Mode clair' : 'Mode sombre'}
+          >
+            <motion.div
+              key={theme}
+              initial={{ y: -20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 20, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </motion.div>
+          </Button>
+
           <div className="hidden sm:block text-right">
             <p className="text-sm font-medium">{name}</p>
             <p className="text-xs text-muted-foreground">{user.role === 'admin' ? 'Administrateur' : 'Utilisateur'}</p>

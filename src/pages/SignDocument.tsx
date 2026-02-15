@@ -5,9 +5,13 @@ import { saveDocument } from '@/lib/documents';
 import { signPDF, type SignaturePosition, type CustomSignaturePosition } from '@/lib/pdf-signer';
 import AppHeader from '@/components/AppHeader';
 import SignatureCanvas from '@/components/SignatureCanvas';
+import SignatureDrawPad from '@/components/SignatureDrawPad';
+import SigningCeremony from '@/components/SigningCeremony';
+import EmailDropdown from '@/components/EmailDropdown';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2, Eye } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2, Eye, PenTool } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -22,7 +26,6 @@ export default function SignDocument() {
   const [pdfUrl, setPdfUrl] = useState('');
   const [pdfBytes, setPdfBytes] = useState<ArrayBuffer | null>(null);
 
-  const [stampFile, setStampFile] = useState<File | null>(null);
   const [stampPreview, setStampPreview] = useState('');
   const [stampBytes, setStampBytes] = useState<Uint8Array | null>(null);
   const [stampType, setStampType] = useState<'png' | 'jpg'>('png');
@@ -35,8 +38,8 @@ export default function SignDocument() {
   const [signedPdfUrl, setSignedPdfUrl] = useState('');
   const [signedFileName, setSignedFileName] = useState('');
   const [docLabel, setDocLabel] = useState('');
+  const [showCeremony, setShowCeremony] = useState(false);
 
-  const [pagePreviewUrl, setPagePreviewUrl] = useState('');
   const [pdfPageImages, setPdfPageImages] = useState<string[]>([]);
   const [selectedPageIndex, setSelectedPageIndex] = useState(0);
 
@@ -71,8 +74,33 @@ export default function SignDocument() {
 
   const handlePdfUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || file.type !== 'application/pdf') {
-      toast.error('Veuillez sélectionner un fichier PDF');
+    if (!file) return;
+
+    // Handle images -> convert to PDF
+    if (file.type.startsWith('image/')) {
+      const { PDFDocument } = await import('pdf-lib');
+      const imgBytes = new Uint8Array(await file.arrayBuffer());
+      const pdfDoc = await PDFDocument.create();
+      const img = file.type.includes('png')
+        ? await pdfDoc.embedPng(imgBytes)
+        : await pdfDoc.embedJpg(imgBytes);
+      const page = pdfDoc.addPage([img.width, img.height]);
+      page.drawImage(img, { x: 0, y: 0, width: img.width, height: img.height });
+      const pdfBytesResult = await pdfDoc.save();
+      const arrayBuf = pdfBytesResult.slice(0).buffer as ArrayBuffer;
+      const blob = new Blob([arrayBuf], { type: 'application/pdf' });
+      setPdfFile(new File([blob], file.name.replace(/\.\w+$/, '.pdf'), { type: 'application/pdf' }));
+      setPdfBytes(arrayBuf);
+      setPdfUrl(URL.createObjectURL(blob));
+      setDocLabel(file.name.replace(/\.\w+$/, ''));
+      renderPdfPages(arrayBuf);
+      setStep('read');
+      toast.success('Image convertie en PDF !');
+      return;
+    }
+
+    if (file.type !== 'application/pdf') {
+      toast.error('Formats acceptés : PDF, PNG, JPG');
       return;
     }
     setPdfFile(file);
@@ -90,12 +118,19 @@ export default function SignDocument() {
       toast.error('Veuillez sélectionner une image PNG ou JPG');
       return;
     }
-    setStampFile(file);
     setStampPreview(URL.createObjectURL(file));
     const bytes = new Uint8Array(await file.arrayBuffer());
     setStampBytes(bytes);
     setStampType(file.type.includes('png') ? 'png' : 'jpg');
     setStep('position');
+  };
+
+  const handleDrawnSignature = (dataUrl: string, bytes: Uint8Array, type: 'png') => {
+    setStampPreview(dataUrl);
+    setStampBytes(bytes);
+    setStampType(type);
+    setStep('position');
+    toast.success('Signature prête !');
   };
 
   const handleSign = async () => {
@@ -122,13 +157,18 @@ export default function SignDocument() {
         signedPdfUrl: url,
       });
 
-      setStep('done');
-      toast.success('Document signé avec succès !');
+      setShowCeremony(true);
     } catch (err) {
       toast.error('Erreur lors de la signature du document');
       console.error(err);
     }
     setSigning(false);
+  };
+
+  const handleCeremonyComplete = () => {
+    setShowCeremony(false);
+    setStep('done');
+    toast.success('Document signé avec succès !');
   };
 
   const handleDownload = () => {
@@ -141,8 +181,9 @@ export default function SignDocument() {
   const resetAll = () => {
     setStep('upload');
     setPdfFile(null); setPdfUrl(''); setPdfBytes(null);
-    setStampFile(null); setStampPreview(''); setStampBytes(null);
+    setStampPreview(''); setStampBytes(null);
     setSignedPdfUrl(''); setSignedFileName(''); setDocLabel('');
+    setPdfPageImages([]); setSelectedPageIndex(0);
   };
 
   const positionOptions: { value: SignaturePosition; label: string; desc: string }[] = [
@@ -155,52 +196,74 @@ export default function SignDocument() {
   const steps = [
     { key: 'upload', label: 'Document', num: 1 },
     { key: 'read', label: 'Lecture', num: 2 },
-    { key: 'stamp', label: 'Cachet', num: 3 },
+    { key: 'stamp', label: 'Signature', num: 3 },
     { key: 'position', label: 'Position', num: 4 },
     { key: 'done', label: 'Terminé', num: 5 },
   ];
 
   const currentStepIndex = steps.findIndex(s => s.key === step);
+  const progressPercent = ((currentStepIndex + 1) / steps.length) * 100;
 
   return (
     <div className="min-h-screen bg-secondary/30">
       <AppHeader />
+      <SigningCeremony show={showCeremony} signerName={signerName} onComplete={handleCeremonyComplete} />
+
       <main className="container py-8 max-w-5xl space-y-8">
-        {/* Step indicator */}
-        <div className="flex items-center justify-center gap-1 sm:gap-2">
-          {steps.map((s, i) => (
-            <div key={s.key} className="flex items-center gap-1 sm:gap-2">
-              <div className={`h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all ${
-                i <= currentStepIndex
-                  ? 'bg-primary text-primary-foreground shadow-lg'
-                  : 'bg-muted text-muted-foreground'
-              }`}>
-                {i < currentStepIndex ? <CheckCircle className="h-4 w-4" /> : s.num}
+        {/* Progress bar */}
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+          <Progress value={progressPercent} className="h-2" />
+          <div className="flex items-center justify-center gap-1 sm:gap-2">
+            {steps.map((s, i) => (
+              <div key={s.key} className="flex items-center gap-1 sm:gap-2">
+                <motion.div
+                  initial={false}
+                  animate={{
+                    scale: i === currentStepIndex ? 1.1 : 1,
+                    backgroundColor: i <= currentStepIndex ? 'hsl(var(--primary))' : 'hsl(var(--muted))',
+                  }}
+                  transition={{ type: 'spring', stiffness: 300 }}
+                  className="h-8 w-8 rounded-full flex items-center justify-center text-xs font-semibold"
+                  style={{ color: i <= currentStepIndex ? 'hsl(var(--primary-foreground))' : 'hsl(var(--muted-foreground))' }}
+                >
+                  {i < currentStepIndex ? <CheckCircle className="h-4 w-4" /> : s.num}
+                </motion.div>
+                <span className={`text-xs hidden sm:inline transition-colors ${i <= currentStepIndex ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
+                  {s.label}
+                </span>
+                {i < steps.length - 1 && (
+                  <motion.div
+                    initial={false}
+                    animate={{ backgroundColor: i < currentStepIndex ? 'hsl(var(--primary))' : 'hsl(var(--muted))' }}
+                    className="w-4 sm:w-8 h-0.5 rounded-full"
+                  />
+                )}
               </div>
-              <span className={`text-xs hidden sm:inline ${i <= currentStepIndex ? 'text-foreground font-medium' : 'text-muted-foreground'}`}>
-                {s.label}
-              </span>
-              {i < steps.length - 1 && <div className={`w-4 sm:w-8 h-0.5 ${i < currentStepIndex ? 'bg-primary' : 'bg-muted'}`} />}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </motion.div>
 
         <AnimatePresence mode="wait">
-          {/* Step 1: Upload PDF */}
+          {/* Step 1: Upload */}
           {step === 'upload' && (
-            <motion.div key="upload" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+            <motion.div key="upload" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="glass rounded-2xl p-10 text-center">
-                <input ref={pdfInputRef} type="file" accept="application/pdf" onChange={handlePdfUpload} className="hidden" />
-                <div className="inline-flex h-20 w-20 rounded-2xl bg-accent/50 items-center justify-center mb-6">
+                <input ref={pdfInputRef} type="file" accept="application/pdf,image/png,image/jpeg,image/jpg" onChange={handlePdfUpload} className="hidden" />
+                <motion.div
+                  initial={{ scale: 0.8 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200 }}
+                  className="inline-flex h-20 w-20 rounded-2xl bg-accent/50 items-center justify-center mb-6"
+                >
                   <FileText className="h-10 w-10 text-primary" />
-                </div>
-                <h2 className="text-xl font-bold mb-2">Téléchargez votre document PDF</h2>
+                </motion.div>
+                <h2 className="text-xl font-bold mb-2">Téléchargez votre document</h2>
                 <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
-                  Sélectionnez le fichier PDF que vous souhaitez signer. Vous pourrez le lire avant de procéder.
+                  PDF, PNG ou JPG — les images seront automatiquement converties en PDF.
                 </p>
-                <Button size="lg" onClick={() => pdfInputRef.current?.click()} className="gap-2 shadow-lg">
+                <Button size="lg" onClick={() => pdfInputRef.current?.click()} className="gap-2 shadow-lg hover:scale-105 transition-transform">
                   <Upload className="h-5 w-5" />
-                  Choisir un fichier PDF
+                  Choisir un fichier
                 </Button>
               </div>
             </motion.div>
@@ -208,7 +271,7 @@ export default function SignDocument() {
 
           {/* Step 2: Read Document */}
           {step === 'read' && (
-            <motion.div key="read" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+            <motion.div key="read" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="glass rounded-2xl overflow-hidden">
                 <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -219,16 +282,11 @@ export default function SignDocument() {
                 </div>
                 <object data={pdfUrl} type="application/pdf" className="w-full h-[600px]">
                   <p className="p-8 text-center text-muted-foreground">
-                    Aperçu PDF non disponible dans ce navigateur.
-                    <br />
-                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline mt-2 inline-block">
-                      Ouvrir dans un nouvel onglet
-                    </a>
+                    Aperçu PDF non disponible.
+                    <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="text-primary underline ml-2">Ouvrir</a>
                   </p>
                 </object>
               </div>
-
-              {/* Label input */}
               <div className="glass rounded-2xl p-4">
                 <Label className="text-sm font-medium mb-2 block">Libellé du document (optionnel)</Label>
                 <input
@@ -239,23 +297,22 @@ export default function SignDocument() {
                   className="w-full px-3 py-2 rounded-lg border bg-background text-sm"
                 />
               </div>
-
               <div className="flex justify-between">
                 <Button variant="ghost" onClick={() => setStep('upload')} className="gap-2">
                   <ArrowLeft className="h-4 w-4" /> Retour
                 </Button>
-                <Button onClick={() => setStep('stamp')} className="gap-2 shadow-lg">
-                  Document vérifié, continuer
-                  <CheckCircle className="h-4 w-4" />
+                <Button onClick={() => setStep('stamp')} className="gap-2 shadow-lg hover:scale-105 transition-transform">
+                  Document vérifié, continuer <CheckCircle className="h-4 w-4" />
                 </Button>
               </div>
             </motion.div>
           )}
 
-          {/* Step 3: Upload Stamp */}
+          {/* Step 3: Signature (Draw / Type / Upload) */}
           {step === 'stamp' && (
-            <motion.div key="stamp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
+            <motion.div key="stamp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
+                {/* PDF preview */}
                 <div className="glass rounded-2xl overflow-hidden">
                   <div className="p-3 border-b bg-muted/30">
                     <p className="text-sm font-medium flex items-center gap-2">
@@ -267,27 +324,37 @@ export default function SignDocument() {
                   </object>
                 </div>
 
-                <div className="glass rounded-2xl p-8 flex flex-col items-center justify-center">
-                  <input ref={stampInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
-                  {stampPreview ? (
-                    <div className="text-center space-y-4">
-                      <p className="text-sm font-semibold">Aperçu du cachet</p>
-                      <img src={stampPreview} alt="Cachet" className="max-h-40 mx-auto border-2 border-dashed border-border rounded-xl p-3" />
-                      <Button variant="outline" onClick={() => stampInputRef.current?.click()}>Changer le cachet</Button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="h-16 w-16 rounded-2xl bg-accent/50 flex items-center justify-center mb-4">
-                        <Image className="h-8 w-8 text-primary" />
+                {/* Signature creation */}
+                <div className="glass rounded-2xl p-6 space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <PenTool className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-bold">Créez votre signature</h3>
+                  </div>
+
+                  <SignatureDrawPad onSignatureReady={handleDrawnSignature} />
+
+                  <div className="relative flex items-center gap-3 py-2">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-muted-foreground">ou</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+
+                  {/* Upload stamp image */}
+                  <div className="text-center">
+                    <input ref={stampInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
+                    {stampPreview ? (
+                      <div className="space-y-3">
+                        <p className="text-sm font-semibold">Cachet actuel</p>
+                        <img src={stampPreview} alt="Cachet" className="max-h-24 mx-auto border-2 border-dashed border-border rounded-xl p-2" />
+                        <Button variant="outline" size="sm" onClick={() => stampInputRef.current?.click()}>Changer</Button>
                       </div>
-                      <h3 className="text-lg font-bold mb-2">Votre cachet professionnel</h3>
-                      <p className="text-sm text-muted-foreground text-center mb-6">Image PNG ou JPG</p>
+                    ) : (
                       <Button variant="outline" onClick={() => stampInputRef.current?.click()} className="gap-2">
-                        <Upload className="h-4 w-4" />
-                        Choisir une image
+                        <Image className="h-4 w-4" />
+                        Importer un cachet / tampon
                       </Button>
-                    </>
-                  )}
+                    )}
+                  </div>
                 </div>
               </div>
               <div className="flex justify-start">
@@ -298,10 +365,9 @@ export default function SignDocument() {
             </motion.div>
           )}
 
-          {/* Step 4: Position Signature with Drag & Drop */}
+          {/* Step 4: Position Signature */}
           {step === 'position' && (
-            <motion.div key="position" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-              {/* Page selection */}
+            <motion.div key="position" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="glass rounded-2xl p-5">
                 <h3 className="text-sm font-semibold mb-3">Pages à signer</h3>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -322,14 +388,12 @@ export default function SignDocument() {
                 </div>
               </div>
 
-              {/* Drag & drop positioning */}
               <div className="glass rounded-2xl p-5">
                 <h3 className="text-sm font-semibold mb-1">Positionnez votre signature</h3>
                 <p className="text-xs text-muted-foreground mb-4">
-                  Déplacez le cachet et le nom du signataire où vous souhaitez sur le document. Ajustez la taille avec le curseur.
+                  Glissez-déposez le cachet et le nom librement sur le document.
                 </p>
 
-                {/* Page selector thumbnails */}
                 {pdfPageImages.length > 1 && (
                   <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                     {pdfPageImages.map((img, i) => (
@@ -360,7 +424,7 @@ export default function SignDocument() {
                 <Button variant="ghost" onClick={() => setStep('stamp')} className="gap-2">
                   <ArrowLeft className="h-4 w-4" /> Retour
                 </Button>
-                <Button onClick={handleSign} disabled={signing} className="gap-2 shadow-lg" size="lg">
+                <Button onClick={handleSign} disabled={signing} className="gap-2 shadow-lg hover:scale-105 transition-transform" size="lg">
                   {signing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
                   {signing ? 'Signature en cours...' : 'Signer le document'}
                 </Button>
@@ -370,7 +434,7 @@ export default function SignDocument() {
 
           {/* Step 5: Done */}
           {step === 'done' && (
-            <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="glass rounded-2xl p-10 text-center space-y-6">
+            <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="glass rounded-2xl p-10 text-center space-y-6">
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -394,11 +458,12 @@ export default function SignDocument() {
                 </div>
               )}
 
-              <div className="flex justify-center gap-3">
-                <Button size="lg" onClick={handleDownload} className="gap-2 shadow-lg">
+              <div className="flex flex-wrap justify-center gap-3">
+                <Button size="lg" onClick={handleDownload} className="gap-2 shadow-lg hover:scale-105 transition-transform">
                   <Download className="h-5 w-5" />
                   Télécharger le PDF signé
                 </Button>
+                <EmailDropdown fileName={signedFileName} pdfUrl={signedPdfUrl} />
                 <Button variant="outline" size="lg" onClick={resetAll}>
                   Signer un autre document
                 </Button>

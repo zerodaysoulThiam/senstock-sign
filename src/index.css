@@ -47,6 +47,49 @@
     --sidebar-border: 201 20% 90%;
     --sidebar-ring: 201 70% 42%;
   }
+
+  .dark {
+    --background: 220 20% 10%;
+    --foreground: 210 20% 92%;
+
+    --card: 220 18% 13%;
+    --card-foreground: 210 20% 92%;
+
+    --popover: 220 18% 13%;
+    --popover-foreground: 210 20% 92%;
+
+    --primary: 201 70% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 18%;
+    --secondary-foreground: 210 20% 85%;
+
+    --muted: 220 12% 18%;
+    --muted-foreground: 210 10% 55%;
+
+    --accent: 201 40% 22%;
+    --accent-foreground: 201 60% 85%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 12% 20%;
+    --input: 220 12% 20%;
+    --ring: 201 70% 50%;
+
+    --brand: 201 40% 22%;
+    --brand-dark: 201 70% 50%;
+    --brand-darker: 201 60% 60%;
+
+    --sidebar-background: 220 18% 11%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 201 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 201 40% 22%;
+    --sidebar-accent-foreground: 201 60% 85%;
+    --sidebar-border: 220 12% 20%;
+    --sidebar-ring: 201 70% 50%;
+  }
 }
 
 @layer base {
@@ -61,15 +104,19 @@
 
 @layer utilities {
   .glass {
-    @apply bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl;
+    @apply bg-card/80 backdrop-blur-xl border border-border/40 shadow-xl;
+  }
+
+  .dark .glass {
+    @apply bg-card/90 border-border/30 shadow-2xl;
   }
 
   .brand-gradient {
-    background: linear-gradient(135deg, hsl(201, 62%, 86%), hsl(201, 70%, 42%));
+    background: linear-gradient(135deg, hsl(var(--brand)), hsl(var(--brand-dark)));
   }
 
   .text-gradient {
-    background: linear-gradient(135deg, hsl(201, 70%, 42%), hsl(210, 60%, 28%));
+    background: linear-gradient(135deg, hsl(var(--brand-dark)), hsl(var(--brand-darker)));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;

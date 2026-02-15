@@ -3,7 +3,7 @@ import { type SignedDocument } from '@/lib/documents';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Download, Search, ChevronLeft, ChevronRight, Eye, ArrowUpDown } from 'lucide-react';
+import { Download, Search, ChevronLeft, ChevronRight, Eye, ArrowUpDown, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface DocumentHistoryTableProps {
@@ -160,6 +160,16 @@ export default function DocumentHistoryTable({
                             <Button variant="ghost" size="icon" onClick={() => onDownload(doc)} title="Télécharger" className="h-8 w-8">
                               <Download className="h-4 w-4" />
                             </Button>
+                          )}
+                          {doc.signedPdfUrl && (
+                            <a
+                              href={`mailto:?subject=${encodeURIComponent(`Document signé : ${doc.label || doc.fileName}`)}&body=${encodeURIComponent(`Veuillez trouver ci-joint le document signé "${doc.label || doc.fileName}".`)}`}
+                              title="Envoyer par email"
+                            >
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            </a>
                           )}
                         </div>
                       </td>
