@@ -1,3 +1,5 @@
+import { type AuditTrail } from '@/lib/audit';
+
 export interface SignedDocument {
   id: string;
   fileName: string;
@@ -9,6 +11,7 @@ export interface SignedDocument {
   pageCount: number;
   status: 'signed' | 'pending' | 'rejected';
   signedPdfUrl?: string;
+  audit?: AuditTrail;
 }
 
 const DOCS_KEY = 'senstock_documents';
