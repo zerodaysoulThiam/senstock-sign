@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
 import { saveDocument } from '@/lib/documents';
 import { signPDF, type SignaturePosition, type CustomSignaturePosition } from '@/lib/pdf-signer';
+import { createAuditTrail, getPublicIP, type AuditTrail } from '@/lib/audit';
 import AppHeader from '@/components/AppHeader';
 import SignatureCanvas from '@/components/SignatureCanvas';
 import SignatureDrawPad from '@/components/SignatureDrawPad';
 import SigningCeremony from '@/components/SigningCeremony';
+import SignatureProof from '@/components/SignatureProof';
 import EmailDropdown from '@/components/EmailDropdown';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -29,6 +31,7 @@ export default function SignDocument() {
   const [stampPreview, setStampPreview] = useState('');
   const [stampBytes, setStampBytes] = useState<Uint8Array | null>(null);
   const [stampType, setStampType] = useState<'png' | 'jpg'>('png');
+  const [signMethod, setSignMethod] = useState<'draw' | 'type' | 'upload'>('draw');
 
   const [pagePosition, setPagePosition] = useState<SignaturePosition>('last');
   const [customPos, setCustomPos] = useState<CustomSignaturePosition>({
@@ -39,15 +42,18 @@ export default function SignDocument() {
   const [signedFileName, setSignedFileName] = useState('');
   const [docLabel, setDocLabel] = useState('');
   const [showCeremony, setShowCeremony] = useState(false);
+  const [auditTrail, setAuditTrail] = useState<AuditTrail | null>(null);
 
   const [pdfPageImages, setPdfPageImages] = useState<string[]>([]);
   const [selectedPageIndex, setSelectedPageIndex] = useState(0);
+  const [userIP, setUserIP] = useState('Non disponible');
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!user) navigate('/login');
+    getPublicIP().then(setUserIP);
   }, []);
 
   if (!user) return null;
@@ -76,7 +82,6 @@ export default function SignDocument() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Handle images -> convert to PDF
     if (file.type.startsWith('image/')) {
       const { PDFDocument } = await import('pdf-lib');
       const imgBytes = new Uint8Array(await file.arrayBuffer());
@@ -122,6 +127,7 @@ export default function SignDocument() {
     const bytes = new Uint8Array(await file.arrayBuffer());
     setStampBytes(bytes);
     setStampType(file.type.includes('png') ? 'png' : 'jpg');
+    setSignMethod('upload');
     setStep('position');
   };
 
@@ -129,6 +135,7 @@ export default function SignDocument() {
     setStampPreview(dataUrl);
     setStampBytes(bytes);
     setStampType(type);
+    setSignMethod('draw');
     setStep('position');
     toast.success('Signature prête !');
   };
@@ -137,10 +144,22 @@ export default function SignDocument() {
     if (!pdfBytes || !stampBytes || !pdfFile) return;
     setSigning(true);
     try {
-      const { signedPdf, pageCount } = await signPDF(pdfBytes, stampBytes, stampType, signerName, pagePosition, customPos);
+      const audit = createAuditTrail({
+        signerName,
+        signerEmail: user.email,
+        ipAddress: userIP,
+        method: signMethod,
+        documentName: pdfFile.name,
+        documentLabel: docLabel || pdfFile.name,
+        pageCount: pdfPageImages.length || 1,
+        signaturePosition: pagePosition,
+      });
+
+      const { signedPdf, pageCount } = await signPDF(pdfBytes, stampBytes, stampType, signerName, pagePosition, customPos, audit);
       const blob = new Blob([signedPdf.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setSignedPdfUrl(url);
+      setAuditTrail({ ...audit, pageCount });
 
       const fileName = `signé_${pdfFile.name}`;
       setSignedFileName(fileName);
@@ -155,6 +174,7 @@ export default function SignDocument() {
         pageCount,
         status: 'signed',
         signedPdfUrl: url,
+        audit: { ...audit, pageCount },
       });
 
       setShowCeremony(true);
@@ -184,6 +204,7 @@ export default function SignDocument() {
     setStampPreview(''); setStampBytes(null);
     setSignedPdfUrl(''); setSignedFileName(''); setDocLabel('');
     setPdfPageImages([]); setSelectedPageIndex(0);
+    setAuditTrail(null);
   };
 
   const positionOptions: { value: SignaturePosition; label: string; desc: string }[] = [
@@ -308,11 +329,10 @@ export default function SignDocument() {
             </motion.div>
           )}
 
-          {/* Step 3: Signature (Draw / Type / Upload) */}
+          {/* Step 3: Signature */}
           {step === 'stamp' && (
             <motion.div key="stamp" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="grid md:grid-cols-2 gap-6">
-                {/* PDF preview */}
                 <div className="glass rounded-2xl overflow-hidden">
                   <div className="p-3 border-b bg-muted/30">
                     <p className="text-sm font-medium flex items-center gap-2">
@@ -324,7 +344,6 @@ export default function SignDocument() {
                   </object>
                 </div>
 
-                {/* Signature creation */}
                 <div className="glass rounded-2xl p-6 space-y-4">
                   <div className="flex items-center gap-2 mb-2">
                     <PenTool className="h-5 w-5 text-primary" />
@@ -339,7 +358,6 @@ export default function SignDocument() {
                     <div className="flex-1 h-px bg-border" />
                   </div>
 
-                  {/* Upload stamp image */}
                   <div className="text-center">
                     <input ref={stampInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
                     {stampPreview ? (
@@ -365,7 +383,7 @@ export default function SignDocument() {
             </motion.div>
           )}
 
-          {/* Step 4: Position Signature */}
+          {/* Step 4: Position */}
           {step === 'position' && (
             <motion.div key="position" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} transition={{ duration: 0.3 }} className="space-y-6">
               <div className="glass rounded-2xl p-5">
@@ -434,40 +452,45 @@ export default function SignDocument() {
 
           {/* Step 5: Done */}
           {step === 'done' && (
-            <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="glass rounded-2xl p-10 text-center space-y-6">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
-                className="inline-flex h-20 w-20 rounded-full bg-accent items-center justify-center"
-              >
-                <CheckCircle className="h-10 w-10 text-primary" />
-              </motion.div>
-              <div>
-                <h2 className="text-2xl font-bold">Document signé avec succès !</h2>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Signature appliquée sur {pagePosition === 'all' ? 'toutes les pages' : pagePosition === 'first' ? 'la première page' : pagePosition === 'last' ? 'la dernière page' : 'la page du milieu'}
-                </p>
-              </div>
-
-              {signedPdfUrl && (
-                <div className="rounded-xl border overflow-hidden">
-                  <object data={signedPdfUrl} type="application/pdf" className="w-full h-[400px]">
-                    <p className="p-4 text-muted-foreground">Aperçu non disponible</p>
-                  </object>
+            <motion.div key="done" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.4 }} className="space-y-6">
+              <div className="glass rounded-2xl p-10 text-center space-y-6">
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, delay: 0.2 }}
+                  className="inline-flex h-20 w-20 rounded-full bg-accent items-center justify-center"
+                >
+                  <CheckCircle className="h-10 w-10 text-primary" />
+                </motion.div>
+                <div>
+                  <h2 className="text-2xl font-bold">Document signé avec succès !</h2>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    Signature appliquée sur {pagePosition === 'all' ? 'toutes les pages' : pagePosition === 'first' ? 'la première page' : pagePosition === 'last' ? 'la dernière page' : 'la page du milieu'}
+                  </p>
                 </div>
-              )}
 
-              <div className="flex flex-wrap justify-center gap-3">
-                <Button size="lg" onClick={handleDownload} className="gap-2 shadow-lg hover:scale-105 transition-transform">
-                  <Download className="h-5 w-5" />
-                  Télécharger le PDF signé
-                </Button>
-                <EmailDropdown fileName={signedFileName} pdfUrl={signedPdfUrl} />
-                <Button variant="outline" size="lg" onClick={resetAll}>
-                  Signer un autre document
-                </Button>
+                {signedPdfUrl && (
+                  <div className="rounded-xl border overflow-hidden">
+                    <object data={signedPdfUrl} type="application/pdf" className="w-full h-[400px]">
+                      <p className="p-4 text-muted-foreground">Aperçu non disponible</p>
+                    </object>
+                  </div>
+                )}
+
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Button size="lg" onClick={handleDownload} className="gap-2 shadow-lg hover:scale-105 transition-transform">
+                    <Download className="h-5 w-5" />
+                    Télécharger le PDF signé
+                  </Button>
+                  <EmailDropdown fileName={signedFileName} pdfUrl={signedPdfUrl} />
+                  <Button variant="outline" size="lg" onClick={resetAll}>
+                    Signer un autre document
+                  </Button>
+                </div>
               </div>
+
+              {/* Audit Trail / Signature Proof */}
+              {auditTrail && <SignatureProof audit={auditTrail} />}
             </motion.div>
           )}
         </AnimatePresence>
