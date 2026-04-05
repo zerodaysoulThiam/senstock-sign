@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Move, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
-import { Label } from '@/components/ui/label';
 
 interface SignatureCanvasProps {
   pdfPageImage: string;
@@ -116,40 +115,37 @@ export default function SignatureCanvas({
     setStampSize(120);
   };
 
-  const stampRatio = stampPreview ? 0.6 : 1;
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Controls */}
-      <div className="flex flex-wrap items-center gap-4 p-3 bg-muted/50 rounded-xl border">
+      <div className="flex flex-wrap items-center gap-3 p-2.5 bg-muted/50 rounded-lg border">
         <div className="flex items-center gap-2">
-          <ZoomOut className="h-4 w-4 text-muted-foreground" />
+          <ZoomOut className="h-3.5 w-3.5 text-muted-foreground" />
           <Slider
             value={[stampSize]}
             onValueChange={([v]) => setStampSize(v)}
             min={40}
             max={250}
             step={5}
-            className="w-32"
+            className="w-28"
           />
-          <ZoomIn className="h-4 w-4 text-muted-foreground" />
-          <Label className="text-xs text-muted-foreground ml-1">{stampSize}px</Label>
+          <ZoomIn className="h-3.5 w-3.5 text-muted-foreground" />
+          <span className="text-[10px] text-muted-foreground">{stampSize}px</span>
         </div>
-        <Button variant="ghost" size="sm" onClick={resetPositions} className="gap-1 text-xs">
-          <RotateCcw className="h-3 w-3" /> Réinitialiser
+        <Button variant="ghost" size="sm" onClick={resetPositions} className="gap-1 text-xs h-7">
+          <RotateCcw className="h-3 w-3" /> Reset
         </Button>
-        <p className="text-xs text-muted-foreground flex items-center gap-1">
-          <Move className="h-3 w-3" /> Glissez le cachet et le nom pour les positionner
+        <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <Move className="h-3 w-3" /> Glissez pour positionner
         </p>
       </div>
 
       {/* Canvas */}
       <div
         ref={containerRef}
-        className="relative border-2 border-dashed border-border rounded-xl overflow-hidden bg-muted/20 select-none"
+        className="relative border border-border rounded-lg overflow-hidden bg-muted/20 select-none"
         style={{ aspectRatio: `${pageWidth} / ${pageHeight}` }}
       >
-        {/* PDF page background */}
         {pdfPageImage && (
           <img
             src={pdfPageImage}
@@ -164,7 +160,7 @@ export default function SignatureCanvas({
           onMouseDown={(e) => handleMouseDown('stamp', e)}
           onTouchStart={(e) => handleTouchStart('stamp', e)}
           className={`absolute cursor-grab active:cursor-grabbing transition-shadow ${
-            dragging === 'stamp' ? 'ring-2 ring-primary shadow-lg z-20' : 'hover:ring-2 hover:ring-primary/50 z-10'
+            dragging === 'stamp' ? 'ring-2 ring-primary shadow-md z-20' : 'hover:ring-1 hover:ring-primary/50 z-10'
           }`}
           style={{
             left: `${stampPos.x}%`,
@@ -175,12 +171,12 @@ export default function SignatureCanvas({
         >
           <img
             src={stampPreview}
-            alt="Cachet"
+            alt="Signature"
             className="w-full h-auto rounded"
             draggable={false}
           />
-          <div className="absolute -top-1 -right-1 h-5 w-5 bg-primary rounded-full flex items-center justify-center shadow">
-            <Move className="h-3 w-3 text-primary-foreground" />
+          <div className="absolute -top-1 -right-1 h-4 w-4 bg-primary rounded-full flex items-center justify-center">
+            <Move className="h-2.5 w-2.5 text-primary-foreground" />
           </div>
         </div>
 
@@ -189,7 +185,7 @@ export default function SignatureCanvas({
           onMouseDown={(e) => handleMouseDown('name', e)}
           onTouchStart={(e) => handleTouchStart('name', e)}
           className={`absolute cursor-grab active:cursor-grabbing transition-shadow ${
-            dragging === 'name' ? 'ring-2 ring-primary shadow-lg z-20' : 'hover:ring-2 hover:ring-primary/50 z-10'
+            dragging === 'name' ? 'ring-2 ring-primary shadow-md z-20' : 'hover:ring-1 hover:ring-primary/50 z-10'
           }`}
           style={{
             left: `${namePos.x}%`,
@@ -197,12 +193,12 @@ export default function SignatureCanvas({
             transform: 'translate(-50%, -50%)',
           }}
         >
-          <div className="bg-card/90 backdrop-blur-sm border rounded-lg px-3 py-2 shadow-sm whitespace-nowrap">
-            <p className="text-sm font-semibold text-foreground">{signerName}</p>
-            <p className="text-[10px] text-muted-foreground">{new Date().toLocaleDateString('fr-FR')} · Signature électronique SENSTOCK</p>
+          <div className="bg-card border border-border rounded px-2.5 py-1.5 shadow-sm whitespace-nowrap">
+            <p className="text-xs font-semibold text-foreground">{signerName}</p>
+            <p className="text-[9px] text-muted-foreground">{new Date().toLocaleDateString('fr-FR')} · SENSTOCK</p>
           </div>
-          <div className="absolute -top-1 -right-1 h-5 w-5 bg-accent rounded-full flex items-center justify-center shadow">
-            <Move className="h-3 w-3 text-accent-foreground" />
+          <div className="absolute -top-1 -right-1 h-4 w-4 bg-muted rounded-full flex items-center justify-center border">
+            <Move className="h-2.5 w-2.5 text-muted-foreground" />
           </div>
         </div>
       </div>

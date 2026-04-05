@@ -23,7 +23,6 @@ export default function SignatureDrawPad({ onSignatureReady }: SignatureDrawPadP
   const [selectedFont, setSelectedFont] = useState(0);
   const uploadRef = useRef<HTMLInputElement>(null);
 
-  // Load Google Fonts for typed signatures
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@700&family=Great+Vibes&family=Pacifico&family=Satisfy&display=swap';
@@ -119,85 +118,83 @@ export default function SignatureDrawPad({ onSignatureReady }: SignatureDrawPadP
   };
 
   return (
-    <div className="space-y-4">
-      <Tabs defaultValue="draw" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="draw" className="gap-2 text-xs"><Pen className="h-3.5 w-3.5" /> Dessiner</TabsTrigger>
-          <TabsTrigger value="type" className="gap-2 text-xs"><Type className="h-3.5 w-3.5" /> Taper</TabsTrigger>
-          <TabsTrigger value="upload" className="gap-2 text-xs"><Upload className="h-3.5 w-3.5" /> Importer</TabsTrigger>
-        </TabsList>
+    <Tabs defaultValue="draw" className="w-full">
+      <TabsList className="grid w-full grid-cols-3 h-8">
+        <TabsTrigger value="draw" className="gap-1.5 text-xs h-7"><Pen className="h-3 w-3" /> Dessiner</TabsTrigger>
+        <TabsTrigger value="type" className="gap-1.5 text-xs h-7"><Type className="h-3 w-3" /> Taper</TabsTrigger>
+        <TabsTrigger value="upload" className="gap-1.5 text-xs h-7"><Upload className="h-3 w-3" /> Importer</TabsTrigger>
+      </TabsList>
 
-        <TabsContent value="draw" className="space-y-3 mt-3">
-          <div className="relative border-2 border-dashed border-border rounded-xl overflow-hidden bg-card">
-            <canvas
-              ref={canvasRef}
-              width={500}
-              height={200}
-              className="w-full cursor-crosshair touch-none"
-              style={{ height: '160px' }}
-              onMouseDown={startDraw}
-              onMouseMove={draw}
-              onMouseUp={stopDraw}
-              onMouseLeave={stopDraw}
-              onTouchStart={startDraw}
-              onTouchMove={draw}
-              onTouchEnd={stopDraw}
-            />
-            <div className="absolute bottom-2 left-2 right-2 border-t border-dashed border-muted-foreground/30" />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={clearCanvas} className="gap-1">
-              <Eraser className="h-3.5 w-3.5" /> Effacer
-            </Button>
-            <Button size="sm" onClick={exportCanvas} className="gap-1">
-              Utiliser cette signature
-            </Button>
-          </div>
-        </TabsContent>
-
-        <TabsContent value="type" className="space-y-3 mt-3">
-          <div>
-            <Label className="text-xs mb-1.5 block">Votre nom</Label>
-            <Input
-              value={typedName}
-              onChange={e => setTypedName(e.target.value)}
-              placeholder="Tapez votre nom..."
-              className="mb-3"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {SIGNATURE_FONTS.map((f, i) => (
-              <button
-                key={f.name}
-                onClick={() => setSelectedFont(i)}
-                className={`p-3 rounded-xl border-2 text-center transition-all ${
-                  selectedFont === i ? 'border-primary bg-accent/50' : 'border-border hover:border-primary/40'
-                }`}
-              >
-                <span style={{ fontFamily: f.style, fontSize: '20px' }}>
-                  {typedName || 'Signature'}
-                </span>
-                <p className="text-[10px] text-muted-foreground mt-1">{f.name}</p>
-              </button>
-            ))}
-          </div>
-          <Button size="sm" onClick={generateTypedSignature} disabled={!typedName.trim()}>
+      <TabsContent value="draw" className="space-y-2 mt-3">
+        <div className="relative border border-border rounded-lg overflow-hidden bg-card">
+          <canvas
+            ref={canvasRef}
+            width={500}
+            height={200}
+            className="w-full cursor-crosshair touch-none"
+            style={{ height: '140px' }}
+            onMouseDown={startDraw}
+            onMouseMove={draw}
+            onMouseUp={stopDraw}
+            onMouseLeave={stopDraw}
+            onTouchStart={startDraw}
+            onTouchMove={draw}
+            onTouchEnd={stopDraw}
+          />
+          <div className="absolute bottom-3 left-4 right-4 border-t border-dashed border-muted-foreground/20" />
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={clearCanvas} className="gap-1 text-xs h-7">
+            <Eraser className="h-3 w-3" /> Effacer
+          </Button>
+          <Button size="sm" onClick={exportCanvas} className="text-xs h-7">
             Utiliser cette signature
           </Button>
-        </TabsContent>
+        </div>
+      </TabsContent>
 
-        <TabsContent value="upload" className="space-y-3 mt-3">
-          <input ref={uploadRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
-          <div
-            onClick={() => uploadRef.current?.click()}
-            className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary/50 transition-colors"
-          >
-            <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-            <p className="text-sm font-medium">Importez votre signature manuscrite</p>
-            <p className="text-xs text-muted-foreground mt-1">PNG, JPG ou image scannée</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
+      <TabsContent value="type" className="space-y-3 mt-3">
+        <div>
+          <Label className="text-xs mb-1 block">Votre nom</Label>
+          <Input
+            value={typedName}
+            onChange={e => setTypedName(e.target.value)}
+            placeholder="Tapez votre nom..."
+            className="h-9"
+          />
+        </div>
+        <div className="grid grid-cols-2 gap-2">
+          {SIGNATURE_FONTS.map((f, i) => (
+            <button
+              key={f.name}
+              onClick={() => setSelectedFont(i)}
+              className={`p-3 rounded-lg border text-center transition-all ${
+                selectedFont === i ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/40'
+              }`}
+            >
+              <span style={{ fontFamily: f.style, fontSize: '18px' }}>
+                {typedName || 'Signature'}
+              </span>
+              <p className="text-[10px] text-muted-foreground mt-1">{f.name}</p>
+            </button>
+          ))}
+        </div>
+        <Button size="sm" onClick={generateTypedSignature} disabled={!typedName.trim()} className="text-xs h-7">
+          Utiliser cette signature
+        </Button>
+      </TabsContent>
+
+      <TabsContent value="upload" className="mt-3">
+        <input ref={uploadRef} type="file" accept="image/*" onChange={handleUpload} className="hidden" />
+        <div
+          onClick={() => uploadRef.current?.click()}
+          className="border border-dashed border-border rounded-lg p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+        >
+          <Upload className="h-6 w-6 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm font-medium">Importez votre signature</p>
+          <p className="text-xs text-muted-foreground mt-0.5">PNG, JPG ou image scannée</p>
+        </div>
+      </TabsContent>
+    </Tabs>
   );
 }
