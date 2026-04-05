@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { FileText, Calendar, Clock, TrendingUp, Users, Award } from 'lucide-react';
+import { TrendingUp, Users } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 
 interface DashboardStatsProps {
@@ -15,98 +15,65 @@ interface DashboardStatsProps {
 }
 
 const COLORS = [
-  'hsl(201, 70%, 42%)',
-  'hsl(201, 62%, 70%)',
-  'hsl(210, 60%, 28%)',
-  'hsl(170, 50%, 45%)',
+  'hsl(220, 80%, 50%)',
+  'hsl(220, 60%, 70%)',
+  'hsl(142, 60%, 45%)',
+  'hsl(38, 80%, 50%)',
+  'hsl(280, 60%, 50%)',
   'hsl(340, 60%, 55%)',
-  'hsl(45, 80%, 55%)',
 ];
 
 export default function DashboardStats({ stats }: DashboardStatsProps) {
-  const cards = [
-    { label: 'Total signés', value: stats.total, icon: FileText, color: 'from-primary to-brand-dark' },
-    { label: 'Ce mois-ci', value: stats.thisMonth, icon: Calendar, color: 'from-emerald-500 to-emerald-600' },
-    { label: 'En attente', value: stats.pending, icon: Clock, color: 'from-amber-500 to-amber-600' },
-    { label: 'Top signataire', value: stats.topSigner, icon: Award, color: 'from-purple-500 to-purple-600', isText: true },
-  ];
-
   return (
-    <div className="space-y-6">
-      {/* Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {cards.map((card, i) => (
-          <motion.div
-            key={card.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            className="glass rounded-2xl p-5 group hover:shadow-xl transition-all duration-300"
-          >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{card.label}</p>
-                <p className={`mt-2 font-bold ${card.isText ? 'text-lg truncate' : 'text-3xl'}`}>
-                  {card.value}
-                </p>
-              </div>
-              <div className={`h-11 w-11 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                <card.icon className="h-5 w-5 text-primary-foreground" />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Charts */}
-      <div className="grid md:grid-cols-2 gap-6">
+    <div className="space-y-4">
+      <div className="grid md:grid-cols-2 gap-4">
         {/* Area Chart */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="glass rounded-2xl p-6"
+          transition={{ delay: 0.1 }}
+          className="bg-card border border-border rounded-lg p-5"
         >
-          <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             <TrendingUp className="h-4 w-4 text-primary" />
-            Activité mensuelle
-          </h3>
+            <h3 className="text-sm font-semibold text-foreground">Activité mensuelle</h3>
+          </div>
           <p className="text-xs text-muted-foreground mb-4">Évolution des signatures</p>
           {stats.byMonth.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <AreaChart data={stats.byMonth}>
                 <defs>
                   <linearGradient id="colorCount" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(201, 70%, 42%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(201, 70%, 42%)" stopOpacity={0} />
+                    <stop offset="5%" stopColor="hsl(220, 80%, 50%)" stopOpacity={0.15} />
+                    <stop offset="95%" stopColor="hsl(220, 80%, 50%)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(201,20%,90%)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(220, 13%, 91%)" />
                 <XAxis dataKey="month" tick={{ fontSize: 11 }} />
                 <YAxis allowDecimals={false} tick={{ fontSize: 11 }} />
                 <Tooltip />
-                <Area type="monotone" dataKey="count" stroke="hsl(201,70%,42%)" fillOpacity={1} fill="url(#colorCount)" strokeWidth={2} />
+                <Area type="monotone" dataKey="count" stroke="hsl(220, 80%, 50%)" fillOpacity={1} fill="url(#colorCount)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">Aucune donnée</div>
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">Aucune donnée disponible</div>
           )}
         </motion.div>
 
         {/* Pie Chart */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="glass rounded-2xl p-6"
+          transition={{ delay: 0.15 }}
+          className="bg-card border border-border rounded-lg p-5"
         >
-          <h3 className="text-sm font-semibold mb-1 flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-1">
             <Users className="h-4 w-4 text-primary" />
-            Répartition par signataire
-          </h3>
-          <p className="text-xs text-muted-foreground mb-4">Contribution de chaque utilisateur</p>
+            <h3 className="text-sm font-semibold text-foreground">Par signataire</h3>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Répartition des signatures</p>
           {stats.byUser.length > 0 ? (
-            <ResponsiveContainer width="100%" height={220}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={stats.byUser}
@@ -114,9 +81,9 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  outerRadius={80}
+                  outerRadius={75}
                   innerRadius={40}
-                  paddingAngle={3}
+                  paddingAngle={2}
                   label={({ name, percent }) => `${name.split(' ')[0]} ${(percent * 100).toFixed(0)}%`}
                 >
                   {stats.byUser.map((_, i) => (
@@ -127,7 +94,7 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
               </PieChart>
             </ResponsiveContainer>
           ) : (
-            <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">Aucune donnée</div>
+            <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">Aucune donnée disponible</div>
           )}
         </motion.div>
       </div>
@@ -135,19 +102,19 @@ export default function DashboardStats({ stats }: DashboardStatsProps) {
       {/* Recent Signatories */}
       {stats.recentSigners.length > 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="glass rounded-2xl p-6"
+          transition={{ delay: 0.2 }}
+          className="bg-card border border-border rounded-lg p-5"
         >
-          <h3 className="text-sm font-semibold mb-4">10 derniers signataires</h3>
-          <div className="flex flex-wrap gap-3">
+          <h3 className="text-sm font-semibold text-foreground mb-3">Dernières signatures</h3>
+          <div className="flex flex-wrap gap-2">
             {stats.recentSigners.map((doc, i) => (
-              <div key={doc.id || i} className="flex items-center gap-2 bg-muted/50 rounded-full px-3 py-1.5">
-                <div className="h-6 w-6 rounded-full bg-accent flex items-center justify-center text-[10px] font-bold text-accent-foreground">
+              <div key={doc.id || i} className="flex items-center gap-2 bg-muted rounded-full px-3 py-1.5">
+                <div className="h-5 w-5 rounded-full bg-primary/10 flex items-center justify-center text-[9px] font-bold text-primary">
                   {doc.signedByName?.split(' ').map((n: string) => n[0]).join('')}
                 </div>
-                <span className="text-xs font-medium">{doc.signedByName}</span>
+                <span className="text-xs font-medium text-foreground">{doc.signedByName}</span>
                 <span className="text-[10px] text-muted-foreground">
                   {new Date(doc.signedAt).toLocaleDateString('fr-FR')}
                 </span>

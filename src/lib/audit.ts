@@ -46,14 +46,32 @@ export function detectDevice(): { browser: string; os: string; device: string } 
   return { browser, os, device };
 }
 
-export async function getPublicIP(): Promise<string> {
-  try {
-    const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
-    const data = await res.json();
-    return data.ip || 'Non disponible';
-  } catch {
-    return 'Non disponible';
+// Generate a unique session fingerprint instead of relying on external IP fetch
+export function getSessionFingerprint(): string {
+  const nav = navigator;
+  const screen = window.screen;
+  const raw = [
+    nav.userAgent,
+    nav.language,
+    screen.width + 'x' + screen.height,
+    screen.colorDepth,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    new Date().getTimezoneOffset(),
+  ].join('|');
+  
+  // Simple hash
+  let hash = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const char = raw.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash |= 0;
   }
+  return 'FP-' + Math.abs(hash).toString(36).toUpperCase();
+}
+
+export function getPublicIP(): string {
+  // Return session fingerprint instead of making external API call
+  return getSessionFingerprint();
 }
 
 export function createAuditTrail(params: {
