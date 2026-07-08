@@ -55,6 +55,34 @@ export function makeSignatureId(seed: string): string {
   return `SIGN-${base}`;
 }
 
+export function pagesLabelFor(position: string): string {
+  switch (position) {
+    case 'first': return 'Première';
+    case 'last': return 'Dernière';
+    case 'all': return 'Toutes les pages';
+    case 'middle': return 'Page du milieu';
+    default: return position || '—';
+  }
+}
+
+export function receiptFromDoc(doc: {
+  id: string; fileName: string; signedBy: string; signedByName: string;
+  signedAt: string; signaturePosition: string;
+}): SignatureReceiptData {
+  const seed = `${doc.signedBy}|${doc.fileName}|${doc.signedAt}|${doc.id}`;
+  return {
+    signatureId: makeSignatureId(seed),
+    signerName: doc.signedByName,
+    signerEmail: doc.signedBy,
+    signedAt: doc.signedAt,
+    device: detectDevice(),
+    ipOrSession: makeSessionFingerprint(seed),
+    method: 'Signature électronique avec cachet',
+    fileName: doc.fileName,
+    pagesSigned: pagesLabelFor(doc.signaturePosition),
+  };
+}
+
 export default function SignatureReceipt({ data }: { data: SignatureReceiptData }) {
   const rows: { icon: any; label: string; value: string }[] = [
     { icon: Hash, label: 'ID de signature', value: data.signatureId },
