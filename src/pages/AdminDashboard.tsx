@@ -6,10 +6,13 @@ import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download } from 'lucide-react';
+import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
+import EmailShareMenu from '@/components/EmailShareMenu';
+import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 type Tab = 'documents' | 'users' | 'stats';
 
@@ -32,6 +35,7 @@ export default function AdminDashboard() {
 
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [receiptDoc, setReceiptDoc] = useState<SignedDocument | null>(null);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') { navigate('/login'); return; }
@@ -133,10 +137,16 @@ export default function AdminDashboard() {
                         <td className="p-3 text-muted-foreground">{new Date(doc.signedAt).toLocaleDateString('fr-FR')}</td>
                         <td className="p-3 hidden md:table-cell text-muted-foreground">{doc.pageCount}</td>
                         <td className="p-3 text-right">
-                          <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
-                            onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
-                            <Download className="h-4 w-4" />
-                          </Button>
+                          <div className="inline-flex items-center gap-1">
+                            <Button variant="ghost" size="icon" title="Journal de signature" onClick={() => setReceiptDoc(doc)}>
+                              <FileSignature className="h-4 w-4" />
+                            </Button>
+                            <EmailShareMenu fileName={doc.fileName} signerName={doc.signedByName} signedAt={doc.signedAt} variant="ghost" size="icon" iconOnly />
+                            <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
+                              onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -292,6 +302,15 @@ export default function AdminDashboard() {
           </motion.div>
         )}
       </main>
+
+      <Dialog open={!!receiptDoc} onOpenChange={(o) => !o && setReceiptDoc(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Preuve de signature</DialogTitle>
+          </DialogHeader>
+          {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
