@@ -26,6 +26,7 @@ export type Database = {
           signed_at: string | null
           stamp_data: string | null
           status: string
+          storage_path: string | null
           updated_at: string
         }
         Insert: {
@@ -39,6 +40,7 @@ export type Database = {
           signed_at?: string | null
           stamp_data?: string | null
           status?: string
+          storage_path?: string | null
           updated_at?: string
         }
         Update: {
@@ -52,6 +54,7 @@ export type Database = {
           signed_at?: string | null
           stamp_data?: string | null
           status?: string
+          storage_path?: string | null
           updated_at?: string
         }
         Relationships: []
