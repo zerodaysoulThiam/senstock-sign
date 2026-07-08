@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUsers, extractName, addUser, toggleUserActive, type User } from '@/lib/auth';
-import { getDocuments, getStats, type SignedDocument } from '@/lib/documents';
+import { getDocuments, getStats, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck } from 'lucide-react';
+import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
@@ -121,6 +121,7 @@ export default function AdminDashboard() {
                       <th className="text-left p-3 font-medium hidden md:table-cell">Position</th>
                       <th className="text-left p-3 font-medium">Date</th>
                       <th className="text-left p-3 font-medium hidden md:table-cell">Pages</th>
+                      <th className="text-right p-3 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -131,6 +132,12 @@ export default function AdminDashboard() {
                         <td className="p-3 hidden md:table-cell text-muted-foreground capitalize">{doc.signaturePosition}</td>
                         <td className="p-3 text-muted-foreground">{new Date(doc.signedAt).toLocaleDateString('fr-FR')}</td>
                         <td className="p-3 hidden md:table-cell text-muted-foreground">{doc.pageCount}</td>
+                        <td className="p-3 text-right">
+                          <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
+                            onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
