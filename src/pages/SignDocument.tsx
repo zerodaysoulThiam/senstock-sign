@@ -247,7 +247,7 @@ export default function SignDocument() {
             <motion.div key="position" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="bg-card rounded-xl border p-6">
                 <h3 className="text-lg font-semibold mb-2">Position de la signature</h3>
-                <p className="text-sm text-muted-foreground mb-6">Choisissez où appliquer votre signature sur le document</p>
+                <p className="text-sm text-muted-foreground mb-6">Choisissez les pages puis glissez le cachet à l'endroit exact souhaité</p>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   {positionOptions.map(opt => (
@@ -266,17 +266,33 @@ export default function SignDocument() {
                   ))}
                 </div>
 
-                {/* Signature preview */}
-                <div className="mt-6 p-4 bg-muted/50 rounded-xl">
-                  <Label className="text-xs text-muted-foreground mb-2 block">Aperçu de la signature</Label>
-                  <div className="flex items-center gap-4 bg-card p-3 rounded-lg border">
-                    {stampPreview && <img src={stampPreview} alt="Cachet" className="h-12 rounded" />}
-                    <div>
-                      <p className="text-sm font-medium">{signerName}</p>
-                      <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('fr-FR')} · Signature électronique SENSTOCK</p>
+                {/* Free placement on the PDF */}
+                {pdfBytes && stampPreview && (
+                  <div className="mt-6 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <Label className="text-sm font-medium">Placement libre du cachet</Label>
+                      {pageCount > 1 && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Page d'aperçu :</span>
+                          <Button size="sm" variant="outline" disabled={previewPageIndex <= 0}
+                            onClick={() => setPreviewPageIndex(i => Math.max(0, i - 1))}>‹</Button>
+                          <span className="font-medium">{previewPageIndex + 1} / {pageCount}</span>
+                          <Button size="sm" variant="outline" disabled={previewPageIndex >= pageCount - 1}
+                            onClick={() => setPreviewPageIndex(i => Math.min(pageCount - 1, i + 1))}>›</Button>
+                        </div>
+                      )}
                     </div>
+                    <PdfStampPlacer
+                      pdfBytes={pdfBytes}
+                      pageIndex={previewPageIndex}
+                      stampSrc={stampPreview}
+                      onChange={setPlacement}
+                    />
+                    {position === 'all' && (
+                      <p className="text-xs text-muted-foreground">La position choisie sera appliquée à toutes les pages.</p>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="flex justify-between">
