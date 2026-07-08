@@ -12,7 +12,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 type Tab = 'documents' | 'users' | 'stats';
 

@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
