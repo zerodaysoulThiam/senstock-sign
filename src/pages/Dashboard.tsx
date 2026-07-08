@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
-import { getDocuments, type SignedDocument } from '@/lib/documents';
+import { getDocuments, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { PenTool, FileText, Calendar, Download, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { toast } from 'sonner';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -20,6 +21,14 @@ export default function Dashboard() {
   if (!user) return null;
 
   const name = extractName(user.email);
+
+  const handleDownload = async (doc: SignedDocument) => {
+    try {
+      await downloadSignedDocument(doc);
+    } catch (e: any) {
+      toast.error(e?.message || "Téléchargement impossible");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-secondary/30">
@@ -101,7 +110,7 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" title="Télécharger">
+                  <Button variant="ghost" size="icon" title="Télécharger" onClick={() => handleDownload(doc)} disabled={!doc.storagePath}>
                     <Download className="h-4 w-4" />
                   </Button>
                 </motion.div>
