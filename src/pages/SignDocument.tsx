@@ -304,6 +304,11 @@ export default function SignDocument() {
                       pageIndex={previewPageIndex}
                       stampSrc={stampPreview}
                       onChange={setPlacement}
+                      initialRatio={placement ? {
+                        xRatio: placement.x / placement.pageWidth,
+                        yRatio: placement.y / placement.pageHeight,
+                        widthRatio: placement.width / placement.pageWidth,
+                      } : null}
                     />
                     {position === 'all' && (
                       <p className="text-xs text-muted-foreground">La position choisie sera appliquée à toutes les pages.</p>
