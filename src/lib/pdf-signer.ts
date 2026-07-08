@@ -37,14 +37,21 @@ export async function signPDF(
 
   for (const pageIndex of pagesToSign) {
     const page = pages[pageIndex];
-    // Unrotated page dimensions (what pdf-lib draws in)
-    const { width: Wu, height: Hu } = page.getSize();
+    // Use the visible PDF box (CropBox) instead of the full MediaBox.
+    // Excel/large exported PDFs often have a CropBox offset or a rotated
+    // visible area; the preview is based on that visible box, so signing
+    // must use it too or the stamp drifts on heavy/non-A4 documents.
+    const cropBox = page.getCropBox();
+    const boxX = cropBox.x;
+    const boxY = cropBox.y;
+    const boxW = cropBox.width;
+    const boxH = cropBox.height;
     // Page /Rotate — display rotation applied at view time (0/90/180/270 CW)
     const rot = ((page.getRotation().angle % 360) + 360) % 360;
     const sideways = rot === 90 || rot === 270;
     // Visible dimensions (what the user saw in the preview and what ratios refer to)
-    const Wv = sideways ? Hu : Wu;
-    const Hv = sideways ? Wu : Hu;
+    const Wv = sideways ? boxH : boxW;
+    const Hv = sideways ? boxW : boxH;
     const aspect = stampImage.height / stampImage.width;
 
     // Compute stamp size + visible bottom-left (xv, yv) target
@@ -68,7 +75,16 @@ export async function signPDF(
       xv = Wv - sw - 50;
       yv = 50;
     }
-    // Clamp inside the visible page
+    // Keep the stamp inside the visible page, including very small or
+    // mixed-format pages in large documents.
+    if (sw > Wv) {
+      sw = Wv;
+      sh = aspect * sw;
+    }
+    if (sh > Hv) {
+      sh = Hv;
+      sw = sh / aspect;
+    }
     xv = Math.max(0, Math.min(xv, Wv - sw));
     yv = Math.max(0, Math.min(yv, Hv - sh));
 
@@ -79,21 +95,21 @@ export async function signPDF(
     let dx: number, dy: number;
     switch (rot) {
       case 90:
-        dx = Wu - yv;
-        dy = xv;
+        dx = boxX + boxW - yv;
+        dy = boxY + xv;
         break;
       case 180:
-        dx = Wu - xv;
-        dy = Hu - yv;
+        dx = boxX + boxW - xv;
+        dy = boxY + boxH - yv;
         break;
       case 270:
-        dx = yv;
-        dy = Hu - xv;
+        dx = boxX + yv;
+        dy = boxY + boxH - xv;
         break;
       case 0:
       default:
-        dx = xv;
-        dy = yv;
+        dx = boxX + xv;
+        dy = boxY + yv;
     }
 
     page.drawImage(stampImage, {
