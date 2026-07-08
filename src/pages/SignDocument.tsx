@@ -4,6 +4,7 @@ import { getCurrentUser, extractName } from '@/lib/auth';
 import { saveDocument } from '@/lib/documents';
 import { signPDF, type SignaturePosition } from '@/lib/pdf-signer';
 import AppHeader from '@/components/AppHeader';
+import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2 } from 'lucide-react';
@@ -27,6 +28,9 @@ export default function SignDocument() {
   const [stampType, setStampType] = useState<'png' | 'jpg'>('png');
 
   const [position, setPosition] = useState<SignaturePosition>('last');
+  const [placement, setPlacement] = useState<PlacementResult | null>(null);
+  const [previewPageIndex, setPreviewPageIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
   const [signing, setSigning] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
   const [signedFileName, setSignedFileName] = useState('');
@@ -55,6 +59,31 @@ export default function SignDocument() {
     setStep('stamp');
   };
 
+  // When entering position step, choose the preview page based on position
+  useEffect(() => {
+    if (step !== 'position') return;
+    // We derive page count from placement via first render; fallback 1
+    const total = pageCount || 1;
+    let idx = 0;
+    if (position === 'first') idx = 0;
+    else if (position === 'last') idx = total - 1;
+    else if (position === 'middle') idx = Math.floor(total / 2);
+    else if (position === 'all') idx = 0;
+    setPreviewPageIndex(idx);
+  }, [step, position, pageCount]);
+
+  // Extract page count once PDF loaded
+  useEffect(() => {
+    if (!pdfBytes) return;
+    (async () => {
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const doc = await PDFDocument.load(pdfBytes.slice(0));
+        setPageCount(doc.getPageCount());
+      } catch {}
+    })();
+  }, [pdfBytes]);
+
   const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) {
@@ -73,7 +102,14 @@ export default function SignDocument() {
     if (!pdfBytes || !stampBytes || !pdfFile) return;
     setSigning(true);
     try {
-      const { signedPdf, pageCount } = await signPDF(pdfBytes, stampBytes, stampType, signerName, position);
+      const { signedPdf, pageCount } = await signPDF(
+        pdfBytes,
+        stampBytes,
+        stampType,
+        signerName,
+        position,
+        placement ? { x: placement.x, y: placement.y, width: placement.width } : undefined
+      );
       const blob = new Blob([signedPdf.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setSignedPdfUrl(url);
