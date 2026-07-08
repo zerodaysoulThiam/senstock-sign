@@ -2,12 +2,20 @@ import { PDFDocument } from 'pdf-lib';
 
 export type SignaturePosition = 'first' | 'last' | 'all' | 'middle';
 
+export interface StampPlacement {
+  // Position in PDF points (origin bottom-left), for the stamp's bottom-left corner
+  x: number;
+  y: number;
+  width: number; // in PDF points
+}
+
 export async function signPDF(
   pdfBytes: ArrayBuffer,
   stampBytes: Uint8Array,
   stampType: 'png' | 'jpg',
   signerName: string,
-  position: SignaturePosition
+  position: SignaturePosition,
+  placement?: StampPlacement
 ): Promise<{ signedPdf: Uint8Array; pageCount: number }> {
   const pdfDoc = await PDFDocument.load(pdfBytes);
   const pages = pdfDoc.getPages();
@@ -21,12 +29,20 @@ export async function signPDF(
 
   for (const pageIndex of pagesToSign) {
     const page = pages[pageIndex];
-    const { width } = page.getSize();
+    const { width: pw, height: ph } = page.getSize();
 
-    const stampWidth = 120;
+    const stampWidth = placement?.width ?? 120;
     const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
-    const x = width - stampWidth - 50;
-    const y = 50;
+
+    let x: number;
+    let y: number;
+    if (placement) {
+      x = Math.max(0, Math.min(placement.x, pw - stampWidth));
+      y = Math.max(0, Math.min(placement.y, ph - stampHeight));
+    } else {
+      x = pw - stampWidth - 50;
+      y = 50;
+    }
 
     page.drawImage(stampImage, {
       x,

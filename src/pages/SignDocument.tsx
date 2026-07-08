@@ -4,6 +4,7 @@ import { getCurrentUser, extractName } from '@/lib/auth';
 import { saveDocument } from '@/lib/documents';
 import { signPDF, type SignaturePosition } from '@/lib/pdf-signer';
 import AppHeader from '@/components/AppHeader';
+import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2 } from 'lucide-react';
@@ -27,6 +28,9 @@ export default function SignDocument() {
   const [stampType, setStampType] = useState<'png' | 'jpg'>('png');
 
   const [position, setPosition] = useState<SignaturePosition>('last');
+  const [placement, setPlacement] = useState<PlacementResult | null>(null);
+  const [previewPageIndex, setPreviewPageIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
   const [signing, setSigning] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
   const [signedFileName, setSignedFileName] = useState('');
@@ -55,6 +59,31 @@ export default function SignDocument() {
     setStep('stamp');
   };
 
+  // When entering position step, choose the preview page based on position
+  useEffect(() => {
+    if (step !== 'position') return;
+    // We derive page count from placement via first render; fallback 1
+    const total = pageCount || 1;
+    let idx = 0;
+    if (position === 'first') idx = 0;
+    else if (position === 'last') idx = total - 1;
+    else if (position === 'middle') idx = Math.floor(total / 2);
+    else if (position === 'all') idx = 0;
+    setPreviewPageIndex(idx);
+  }, [step, position, pageCount]);
+
+  // Extract page count once PDF loaded
+  useEffect(() => {
+    if (!pdfBytes) return;
+    (async () => {
+      try {
+        const { PDFDocument } = await import('pdf-lib');
+        const doc = await PDFDocument.load(pdfBytes.slice(0));
+        setPageCount(doc.getPageCount());
+      } catch {}
+    })();
+  }, [pdfBytes]);
+
   const handleStampUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith('image/')) {
@@ -73,7 +102,14 @@ export default function SignDocument() {
     if (!pdfBytes || !stampBytes || !pdfFile) return;
     setSigning(true);
     try {
-      const { signedPdf, pageCount } = await signPDF(pdfBytes, stampBytes, stampType, signerName, position);
+      const { signedPdf, pageCount } = await signPDF(
+        pdfBytes,
+        stampBytes,
+        stampType,
+        signerName,
+        position,
+        placement ? { x: placement.x, y: placement.y, width: placement.width } : undefined
+      );
       const blob = new Blob([signedPdf.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       setSignedPdfUrl(url);
@@ -211,7 +247,7 @@ export default function SignDocument() {
             <motion.div key="position" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
               <div className="bg-card rounded-xl border p-6">
                 <h3 className="text-lg font-semibold mb-2">Position de la signature</h3>
-                <p className="text-sm text-muted-foreground mb-6">Choisissez où appliquer votre signature sur le document</p>
+                <p className="text-sm text-muted-foreground mb-6">Choisissez les pages puis glissez le cachet à l'endroit exact souhaité</p>
 
                 <div className="grid sm:grid-cols-2 gap-3">
                   {positionOptions.map(opt => (
@@ -230,17 +266,33 @@ export default function SignDocument() {
                   ))}
                 </div>
 
-                {/* Signature preview */}
-                <div className="mt-6 p-4 bg-muted/50 rounded-xl">
-                  <Label className="text-xs text-muted-foreground mb-2 block">Aperçu de la signature</Label>
-                  <div className="flex items-center gap-4 bg-card p-3 rounded-lg border">
-                    {stampPreview && <img src={stampPreview} alt="Cachet" className="h-12 rounded" />}
-                    <div>
-                      <p className="text-sm font-medium">{signerName}</p>
-                      <p className="text-xs text-muted-foreground">{new Date().toLocaleDateString('fr-FR')} · Signature électronique SENSTOCK</p>
+                {/* Free placement on the PDF */}
+                {pdfBytes && stampPreview && (
+                  <div className="mt-6 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <Label className="text-sm font-medium">Placement libre du cachet</Label>
+                      {pageCount > 1 && (
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">Page d'aperçu :</span>
+                          <Button size="sm" variant="outline" disabled={previewPageIndex <= 0}
+                            onClick={() => setPreviewPageIndex(i => Math.max(0, i - 1))}>‹</Button>
+                          <span className="font-medium">{previewPageIndex + 1} / {pageCount}</span>
+                          <Button size="sm" variant="outline" disabled={previewPageIndex >= pageCount - 1}
+                            onClick={() => setPreviewPageIndex(i => Math.min(pageCount - 1, i + 1))}>›</Button>
+                        </div>
+                      )}
                     </div>
+                    <PdfStampPlacer
+                      pdfBytes={pdfBytes}
+                      pageIndex={previewPageIndex}
+                      stampSrc={stampPreview}
+                      onChange={setPlacement}
+                    />
+                    {position === 'all' && (
+                      <p className="text-xs text-muted-foreground">La position choisie sera appliquée à toutes les pages.</p>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               <div className="flex justify-between">
