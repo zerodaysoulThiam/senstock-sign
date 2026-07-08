@@ -15,10 +15,26 @@ const DEFAULT_USERS: User[] = [
   { email: 'ibrahima.ndiaye@senstock.sn', password: 'password123', role: 'user', active: true },
   { email: 'aminata.sow@senstock.sn', password: 'password123', role: 'user', active: true },
   { email: 'ousmane.ba@senstock.sn', password: 'password123', role: 'user', active: true },
+  { email: 'serigne.thiam@senstock.sn', password: 'passer123', role: 'user', active: true },
 ];
 
 export function initUsers() {
-  if (!localStorage.getItem(USERS_KEY)) {
+  const existing = localStorage.getItem(USERS_KEY);
+  if (!existing) {
+    localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
+    return;
+  }
+  try {
+    const users: User[] = JSON.parse(existing);
+    let changed = false;
+    for (const def of DEFAULT_USERS) {
+      if (!users.find(u => u.email.toLowerCase() === def.email.toLowerCase())) {
+        users.push(def);
+        changed = true;
+      }
+    }
+    if (changed) localStorage.setItem(USERS_KEY, JSON.stringify(users));
+  } catch {
     localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
   }
 }
