@@ -304,10 +304,7 @@ export default function AdminDashboard() {
       </main>
 
       <Dialog open={!!receiptDoc} onOpenChange={(o) => !o && setReceiptDoc(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Preuve de signature</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} onClose={() => setReceiptDoc(null)} />}
         </DialogContent>
       </Dialog>
