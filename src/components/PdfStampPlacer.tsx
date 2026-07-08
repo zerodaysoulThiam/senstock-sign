@@ -81,11 +81,11 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   }, [pdfBytes, pageIndex]);
 
   useEffect(() => {
-    pdfRef.current?.destroy();
+    (pdfRef.current as { destroy?: () => void } | null)?.destroy?.();
     pdfRef.current = null;
     restoredForSizeRef.current = '';
     return () => {
-      pdfRef.current?.destroy();
+      (pdfRef.current as { destroy?: () => void } | null)?.destroy?.();
       pdfRef.current = null;
     };
   }, [pdfBytes]);
