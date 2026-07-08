@@ -7,9 +7,11 @@ import AppHeader from '@/components/AppHeader';
 import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2, Mail } from 'lucide-react';
+import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import SignatureReceipt, { detectDevice, makeSessionFingerprint, makeSignatureId, type SignatureReceiptData } from '@/components/SignatureReceipt';
+import EmailShareMenu from '@/components/EmailShareMenu';
 
 type Step = 'upload' | 'stamp' | 'position' | 'done';
 
@@ -36,6 +38,7 @@ export default function SignDocument() {
   const [signing, setSigning] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
   const [signedFileName, setSignedFileName] = useState('');
+  const [receipt, setReceipt] = useState<SignatureReceiptData | null>(null);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
@@ -154,6 +157,21 @@ export default function SignDocument() {
         toast.error("Document signé mais non sauvegardé dans le cloud");
       }
 
+      const nowIso = new Date().toISOString();
+      const seed = `${user.email}|${pdfFile.name}|${nowIso}`;
+      const pagesLabel = position === 'all' ? 'Toutes les pages' : position === 'first' ? 'Première' : position === 'last' ? 'Dernière' : 'Page du milieu';
+      setReceipt({
+        signatureId: makeSignatureId(seed),
+        signerName,
+        signerEmail: user.email,
+        signedAt: nowIso,
+        device: detectDevice(),
+        ipOrSession: makeSessionFingerprint(seed),
+        method: 'Signature électronique avec cachet',
+        fileName: pdfFile.name,
+        pagesSigned: pagesLabel,
+      });
+
       setStep('done');
       toast.success('Document signé avec succès !');
     } catch (err) {
@@ -168,14 +186,6 @@ export default function SignDocument() {
     a.href = signedPdfUrl;
     a.download = signedFileName;
     a.click();
-  };
-
-  const handleSendEmail = () => {
-    const subject = encodeURIComponent(`Document signé : ${signedFileName}`);
-    const body = encodeURIComponent(
-      `Bonjour,\n\nVeuillez trouver ci-joint le document "${signedFileName}" signé électroniquement par ${signerName} le ${new Date().toLocaleDateString('fr-FR')}.\n\nN'oubliez pas de joindre manuellement le PDF téléchargé à cet e-mail avant de l'envoyer.\n\nCordialement,\n${signerName}`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const positionOptions: { value: SignaturePosition; label: string; desc: string }[] = [
@@ -369,15 +379,12 @@ export default function SignDocument() {
                 </object>
               )}
 
-              <div className="flex justify-center gap-3">
+              <div className="flex flex-wrap justify-center gap-3">
                 <Button onClick={handleDownload} className="gap-2">
                   <Download className="h-4 w-4" />
                   Télécharger le PDF signé
                 </Button>
-                <Button variant="outline" onClick={handleSendEmail} className="gap-2">
-                  <Mail className="h-4 w-4" />
-                  Envoyer par e-mail
-                </Button>
+                <EmailShareMenu fileName={signedFileName || pdfFile?.name || 'document.pdf'} signerName={signerName} />
                 <Button variant="ghost" onClick={() => {
                   setStep('upload');
                   setPdfFile(null);
@@ -387,10 +394,17 @@ export default function SignDocument() {
                   setStampPreview('');
                   setStampBytes(null);
                   setSignedPdfUrl('');
+                  setReceipt(null);
                 }}>
                   Signer un autre document
                 </Button>
               </div>
+
+              {receipt && (
+                <div className="pt-4">
+                  <SignatureReceipt data={receipt} />
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>
