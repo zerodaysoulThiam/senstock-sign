@@ -29,6 +29,7 @@ export default function SignDocument() {
 
   const [position, setPosition] = useState<SignaturePosition>('last');
   const [placement, setPlacement] = useState<PlacementResult | null>(null);
+  const placementRef = useRef<PlacementResult | null>(null);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(0);
   const initialPageChosenRef = useRef(false);
@@ -108,6 +109,11 @@ export default function SignDocument() {
 
   const handleSign = async () => {
     if (!pdfBytes || !stampBytes || !pdfFile) return;
+    const lockedPlacement = placementRef.current ?? placement;
+    if (!lockedPlacement) {
+      toast.error('Veuillez positionner le cachet sur le document avant de signer');
+      return;
+    }
     setSigning(true);
     try {
       const { signedPdf, pageCount } = await signPDF(
@@ -116,16 +122,16 @@ export default function SignDocument() {
         stampType,
         signerName,
         position,
-        placement ? {
-          x: placement.x,
-          y: placement.y,
-          width: placement.width,
-          xRatio: placement.x / placement.pageWidth,
-          yRatio: placement.y / placement.pageHeight,
-          widthRatio: placement.width / placement.pageWidth,
-          refPageWidth: placement.pageWidth,
-          refPageHeight: placement.pageHeight,
-        } : undefined
+        {
+          x: lockedPlacement.x,
+          y: lockedPlacement.y,
+          width: lockedPlacement.width,
+          xRatio: lockedPlacement.x / lockedPlacement.pageWidth,
+          yRatio: lockedPlacement.y / lockedPlacement.pageHeight,
+          widthRatio: lockedPlacement.width / lockedPlacement.pageWidth,
+          refPageWidth: lockedPlacement.pageWidth,
+          refPageHeight: lockedPlacement.pageHeight,
+        }
       );
       const blob = new Blob([signedPdf.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
@@ -303,7 +309,10 @@ export default function SignDocument() {
                       pdfBytes={pdfBytes}
                       pageIndex={previewPageIndex}
                       stampSrc={stampPreview}
-                      onChange={setPlacement}
+                      onChange={(nextPlacement) => {
+                        placementRef.current = nextPlacement;
+                        setPlacement(nextPlacement);
+                      }}
                       initialRatio={placement ? {
                         xRatio: placement.x / placement.pageWidth,
                         yRatio: placement.y / placement.pageHeight,
