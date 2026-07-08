@@ -28,7 +28,7 @@ export default function AdminDashboard() {
   const [tab, setTab] = useState<Tab>('documents');
   const [docs, setDocs] = useState<SignedDocument[]>([]);
   const [users, setUsers] = useState<User[]>([]);
-  const [stats, setStats] = useState(getStats());
+  const [stats, setStats] = useState<{ total: number; byUser: { name: string; count: number }[]; byMonth: { month: string; count: number }[]; topSigner: string }>({ total: 0, byUser: [], byMonth: [], topSigner: 'N/A' });
 
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -38,31 +38,32 @@ export default function AdminDashboard() {
     reload();
   }, []);
 
-  const reload = () => {
-    setDocs(getDocuments());
-    setUsers(getUsers());
-    setStats(getStats());
+  const reload = async () => {
+    const [d, u, s] = await Promise.all([getDocuments(), getUsers(), getStats()]);
+    setDocs(d);
+    setUsers(u);
+    setStats(s);
   };
 
   if (!user || user.role !== 'admin') return null;
 
-  const handleAddUser = (e: React.FormEvent) => {
+  const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !newPassword) return;
-    const result = addUser(newEmail, newPassword);
+    const result = await addUser(newEmail, newPassword);
     if (result === 'created' || result === 'updated') {
       toast.success(result === 'created' ? 'Utilisateur ajouté' : 'Utilisateur mis à jour');
       setNewEmail('');
       setNewPassword('');
-      reload();
+      await reload();
     } else {
-      toast.error('Email ou mot de passe invalide');
+      toast.error('Email invalide ou mot de passe trop court (min 6)');
     }
   };
 
-  const handleToggle = (email: string) => {
-    toggleUserActive(email);
-    reload();
+  const handleToggle = async (userId: string) => {
+    await toggleUserActive(userId);
+    await reload();
   };
 
   const tabs = [
@@ -177,7 +178,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody>
                   {users.map(u => (
-                    <tr key={u.email} className="border-b last:border-0 hover:bg-muted/30">
+                    <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="p-3">
                         <p className="font-medium">{extractName(u.email)}</p>
                         <p className="text-xs text-muted-foreground">{u.email}</p>
@@ -194,7 +195,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="p-3 text-right">
                         {u.role !== 'admin' && (
-                          <Button variant="ghost" size="sm" onClick={() => handleToggle(u.email)} className="gap-1 text-xs">
+                          <Button variant="ghost" size="sm" onClick={() => handleToggle(u.id)} className="gap-1 text-xs">
                             {u.active ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
                             {u.active ? 'Désactiver' : 'Activer'}
                           </Button>
