@@ -9,7 +9,7 @@ import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
@@ -131,10 +131,7 @@ export default function Dashboard() {
       </main>
 
       <Dialog open={!!receiptDoc} onOpenChange={(o) => !o && setReceiptDoc(null)}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Preuve de signature</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} onClose={() => setReceiptDoc(null)} />}
         </DialogContent>
       </Dialog>

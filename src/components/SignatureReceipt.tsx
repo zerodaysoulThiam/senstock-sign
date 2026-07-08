@@ -86,57 +86,57 @@ export function receiptFromDoc(doc: {
 
 export default function SignatureReceipt({ data, onClose }: { data: SignatureReceiptData; onClose?: () => void }) {
   const rows: { icon: any; label: string; value: string }[] = [
-    { icon: Hash, label: 'ID de signature', value: data.signatureId },
-    { icon: PenTool, label: 'Nom du signataire', value: data.signerName },
+    { icon: Hash, label: 'ID', value: data.signatureId },
+    { icon: PenTool, label: 'Signataire', value: data.signerName },
     { icon: Mail, label: 'Email', value: data.signerEmail },
     { icon: Calendar, label: 'Date', value: fmtDate(data.signedAt) },
     { icon: Clock, label: 'Heure', value: fmtTime(data.signedAt) },
-    { icon: MapPin, label: 'Empreinte session', value: data.ipOrSession || '—' },
+    { icon: MapPin, label: 'Empreinte', value: data.ipOrSession || '—' },
     { icon: Monitor, label: 'Appareil', value: data.device || detectDevice() },
     { icon: ShieldCheck, label: 'Méthode', value: data.method || 'Signature électronique' },
     { icon: FileText, label: 'Document', value: data.fileName },
-    { icon: CheckCircle2, label: 'Pages signées', value: data.pagesSigned },
+    { icon: CheckCircle2, label: 'Pages', value: data.pagesSigned },
   ];
   return (
     <div className="bg-card rounded-xl border shadow-sm overflow-hidden text-left">
-      <div className="p-5 border-b bg-gradient-to-r from-accent/60 to-accent/20 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/15 text-primary flex items-center justify-center">
-            <Fingerprint className="h-5 w-5" />
+      <div className="p-3 sm:p-4 border-b bg-gradient-to-r from-accent/60 to-accent/20 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+            <Fingerprint className="h-4 w-4" />
           </div>
-          <div>
-            <h3 className="font-semibold text-sm sm:text-base">Journal de signature — Preuve d'authenticité</h3>
-            <p className="text-xs text-muted-foreground">Audit trail · SENSTOCK e-Signature</p>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-xs sm:text-sm leading-tight">Journal de signature</h3>
+            <p className="text-[10px] text-muted-foreground">Audit trail · SENSTOCK</p>
           </div>
         </div>
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/15 text-primary text-xs font-medium">
-          <ShieldCheck className="h-3.5 w-3.5" /> Vérifié
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/15 text-primary text-[10px] font-medium shrink-0">
+          <ShieldCheck className="h-3 w-3" /> Vérifié
         </span>
       </div>
       <div className="divide-y">
         {rows.map((r) => (
-          <div key={r.label} className="flex items-start gap-3 px-5 py-3">
-            <r.icon className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 flex-1 min-w-0">
-              <span className="text-xs text-muted-foreground uppercase tracking-wide">{r.label}</span>
-              <span className="sm:col-span-2 text-sm font-medium break-words">{r.value}</span>
+          <div key={r.label} className="flex items-start gap-2 px-3 sm:px-4 py-2">
+            <r.icon className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-0.5 sm:gap-3 flex-1 min-w-0">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{r.label}</span>
+              <span className="sm:col-span-2 text-xs sm:text-sm font-medium break-words">{r.value}</span>
             </div>
           </div>
         ))}
-        <div className="flex items-center gap-2 px-5 py-3 bg-accent/20">
-          <CheckCircle2 className="h-4 w-4 text-primary" />
-          <span className="text-sm font-medium text-primary">Statut : Document officiellement signé</span>
+        <div className="flex items-center gap-2 px-3 sm:px-4 py-2 bg-accent/20">
+          <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+          <span className="text-xs font-medium text-primary">Signé officiellement</span>
         </div>
       </div>
-      <div className="px-5 py-3 border-t bg-muted/30">
-        <p className="text-[11px] text-muted-foreground leading-relaxed">
-          Ce journal de signature est généré automatiquement par la plateforme SENSTOCK. Il constitue une preuve d'authenticité horodatée et non modifiable. Les informations sont intégrées dans les propriétés du document PDF signé.
+      <div className="px-3 sm:px-4 py-2 border-t bg-muted/30">
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          Ce journal est généré automatiquement par SENSTOCK. Preuve horodatée intégrée au PDF signé.
         </p>
       </div>
       {onClose && (
-        <div className="px-5 py-3 border-t bg-card flex justify-end">
-          <Button variant="outline" size="sm" onClick={onClose} className="gap-2">
-            <X className="h-4 w-4" />
+        <div className="sticky bottom-0 px-3 sm:px-4 py-2 border-t bg-card flex justify-end">
+          <Button variant="default" size="sm" onClick={onClose} className="gap-1.5 text-xs">
+            <X className="h-3.5 w-3.5" />
             Fermer
           </Button>
         </div>
