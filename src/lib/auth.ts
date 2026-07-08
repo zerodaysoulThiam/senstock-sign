@@ -73,8 +73,10 @@ export function extractName(email: string): string {
 
 export function addUser(email: string, password: string, role: 'admin' | 'user' = 'user') {
   const users = getUsers();
-  if (users.find(u => u.email.toLowerCase() === email.toLowerCase())) return false;
-  users.push({ email, password, role, active: true });
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!normalizedEmail || !password) return false;
+  if (users.find(u => u.email.toLowerCase() === normalizedEmail)) return false;
+  users.push({ email: normalizedEmail, password, role, active: true });
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
   return true;
 }

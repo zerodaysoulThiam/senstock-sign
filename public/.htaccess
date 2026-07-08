@@ -36,9 +36,11 @@ RewriteRule ^ index.html [L]
 # Types MIME
 <IfModule mod_mime.c>
   AddType application/javascript .js
+  AddType application/javascript .mjs
   AddType text/css .css
   AddType application/json .json
   AddType font/woff2 .woff2
+  AddType application/wasm .wasm
 </IfModule>
 
 # Sécurité
