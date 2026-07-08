@@ -133,6 +133,14 @@ export default function SignatureReceipt({ data, onClose }: { data: SignatureRec
           Ce journal de signature est généré automatiquement par la plateforme SENSTOCK. Il constitue une preuve d'authenticité horodatée et non modifiable. Les informations sont intégrées dans les propriétés du document PDF signé.
         </p>
       </div>
+      {onClose && (
+        <div className="px-5 py-3 border-t bg-card flex justify-end">
+          <Button variant="outline" size="sm" onClick={onClose} className="gap-2">
+            <X className="h-4 w-4" />
+            Fermer
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
