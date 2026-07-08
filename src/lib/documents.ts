@@ -9,6 +9,7 @@ export interface SignedDocument {
   signedAt: string;
   signaturePosition: string;
   pageCount: number;
+  storagePath?: string | null;
 }
 
 async function fetchOwnersMap(ownerIds: string[]): Promise<Record<string, string>> {
@@ -30,13 +31,14 @@ function rowToDoc(row: any, emailByOwner: Record<string, string>): SignedDocumen
     signedAt: row.signed_at ?? row.created_at,
     signaturePosition: row.placement?.position ?? "-",
     pageCount: row.placement?.pageCount ?? 0,
+    storagePath: row.storage_path ?? null,
   };
 }
 
 export async function getDocuments(email?: string): Promise<SignedDocument[]> {
   let query = supabase
     .from("documents")
-    .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail")
+    .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail, storage_path")
     .order("created_at", { ascending: false });
   if (email) {
     const { data: prof } = await supabase.from("profiles").select("id").eq("email", email.toLowerCase()).maybeSingle();
@@ -49,9 +51,21 @@ export async function getDocuments(email?: string): Promise<SignedDocument[]> {
   return data.map((d: any) => rowToDoc(d, owners));
 }
 
-export async function saveDocument(doc: Omit<SignedDocument, "id">) {
+export async function saveDocument(doc: Omit<SignedDocument, "id">, pdfBlob?: Blob) {
   const user = getCurrentUser();
   if (!user) throw new Error("Non authentifié");
+  let storagePath: string | null = null;
+  if (pdfBlob) {
+    const safeName = doc.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    storagePath = `${user.id}/${Date.now()}_${safeName}`;
+    const { error: upErr } = await supabase.storage
+      .from("signed-documents")
+      .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: false });
+    if (upErr) {
+      console.error("upload failed", upErr);
+      storagePath = null;
+    }
+  }
   const { data, error } = await supabase
     .from("documents")
     .insert({
@@ -61,11 +75,28 @@ export async function saveDocument(doc: Omit<SignedDocument, "id">) {
       placement: { position: doc.signaturePosition, pageCount: doc.pageCount },
       signed_at: doc.signedAt,
       audit_trail: [{ event: "signed", at: doc.signedAt, by: doc.signedBy }],
+      storage_path: storagePath,
     })
     .select()
     .single();
   if (error) throw error;
-  return { ...doc, id: data.id } as SignedDocument;
+  return { ...doc, id: data.id, storagePath } as SignedDocument;
+}
+
+export async function downloadSignedDocument(doc: SignedDocument): Promise<void> {
+  if (!doc.storagePath) throw new Error("Aucun fichier disponible pour ce document");
+  const { data, error } = await supabase.storage
+    .from("signed-documents")
+    .createSignedUrl(doc.storagePath, 60);
+  if (error || !data?.signedUrl) throw error ?? new Error("URL indisponible");
+  const res = await fetch(data.signedUrl);
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `signé_${doc.fileName}`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function getStats() {
