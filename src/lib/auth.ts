@@ -18,6 +18,23 @@ const DEFAULT_USERS: User[] = [
   { email: 'serigne.thiam@senstock.sn', password: 'passer123', role: 'user', active: true },
 ];
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
+function normalizePassword(password: string) {
+  return password.trim();
+}
+
+function normalizeUser(user: User): User {
+  return {
+    ...user,
+    email: normalizeEmail(user.email),
+    password: normalizePassword(user.password),
+    active: user.active !== false,
+  };
+}
+
 export function initUsers() {
   const existing = localStorage.getItem(USERS_KEY);
   if (!existing) {
@@ -25,8 +42,10 @@ export function initUsers() {
     return;
   }
   try {
-    const users: User[] = JSON.parse(existing);
+    const parsedUsers: User[] = JSON.parse(existing);
+    const users = parsedUsers.map(normalizeUser);
     let changed = false;
+    if (JSON.stringify(users) !== JSON.stringify(parsedUsers)) changed = true;
     for (const def of DEFAULT_USERS) {
       if (!users.find(u => u.email.toLowerCase() === def.email.toLowerCase())) {
         users.push(def);
@@ -46,9 +65,11 @@ export function getUsers(): User[] {
 
 export function login(email: string, password: string): User | null {
   const users = getUsers();
-  const user = users.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === password && u.active);
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = normalizePassword(password);
+  const user = users.find(u => normalizeEmail(u.email) === normalizedEmail && normalizePassword(u.password) === normalizedPassword && u.active);
   if (user) {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(user));
+    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(normalizeUser(user)));
     return user;
   }
   return null;
@@ -73,17 +94,26 @@ export function extractName(email: string): string {
 
 export function addUser(email: string, password: string, role: 'admin' | 'user' = 'user') {
   const users = getUsers();
-  const normalizedEmail = email.trim().toLowerCase();
-  if (!normalizedEmail || !password) return false;
-  if (users.find(u => u.email.toLowerCase() === normalizedEmail)) return false;
-  users.push({ email: normalizedEmail, password, role, active: true });
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = normalizePassword(password);
+  if (!normalizedEmail || !normalizedPassword) return 'invalid';
+  const existingUser = users.find(u => normalizeEmail(u.email) === normalizedEmail);
+  if (existingUser) {
+    existingUser.email = normalizedEmail;
+    existingUser.password = normalizedPassword;
+    existingUser.active = true;
+    localStorage.setItem(USERS_KEY, JSON.stringify(users.map(normalizeUser)));
+    return 'updated';
+  }
+  users.push({ email: normalizedEmail, password: normalizedPassword, role, active: true });
   localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  return true;
+  return 'created';
 }
 
 export function toggleUserActive(email: string) {
   const users = getUsers();
-  const user = users.find(u => u.email === email);
+  const normalizedEmail = normalizeEmail(email);
+  const user = users.find(u => normalizeEmail(u.email) === normalizedEmail);
   if (user && user.role !== 'admin') {
     user.active = !user.active;
     localStorage.setItem(USERS_KEY, JSON.stringify(users));

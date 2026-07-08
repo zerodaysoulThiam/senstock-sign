@@ -49,14 +49,14 @@ export default function AdminDashboard() {
   const handleAddUser = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !newPassword) return;
-    const ok = addUser(newEmail, newPassword);
-    if (ok) {
-      toast.success('Utilisateur ajouté');
+    const result = addUser(newEmail, newPassword);
+    if (result === 'created' || result === 'updated') {
+      toast.success(result === 'created' ? 'Utilisateur ajouté' : 'Utilisateur mis à jour');
       setNewEmail('');
       setNewPassword('');
       reload();
     } else {
-      toast.error('Cet email existe déjà');
+      toast.error('Email ou mot de passe invalide');
     }
   };
 
