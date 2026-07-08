@@ -1,4 +1,5 @@
-import { CheckCircle2, ShieldCheck, Fingerprint, Mail, Calendar, Clock, Monitor, FileText, PenTool, Hash, MapPin } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Fingerprint, Mail, Calendar, Clock, Monitor, FileText, PenTool, Hash, MapPin, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface SignatureReceiptData {
   signatureId: string;
@@ -83,7 +84,7 @@ export function receiptFromDoc(doc: {
   };
 }
 
-export default function SignatureReceipt({ data }: { data: SignatureReceiptData }) {
+export default function SignatureReceipt({ data, onClose }: { data: SignatureReceiptData; onClose?: () => void }) {
   const rows: { icon: any; label: string; value: string }[] = [
     { icon: Hash, label: 'ID de signature', value: data.signatureId },
     { icon: PenTool, label: 'Nom du signataire', value: data.signerName },
@@ -132,6 +133,14 @@ export default function SignatureReceipt({ data }: { data: SignatureReceiptData 
           Ce journal de signature est généré automatiquement par la plateforme SENSTOCK. Il constitue une preuve d'authenticité horodatée et non modifiable. Les informations sont intégrées dans les propriétés du document PDF signé.
         </p>
       </div>
+      {onClose && (
+        <div className="px-5 py-3 border-t bg-card flex justify-end">
+          <Button variant="outline" size="sm" onClick={onClose} className="gap-2">
+            <X className="h-4 w-4" />
+            Fermer
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

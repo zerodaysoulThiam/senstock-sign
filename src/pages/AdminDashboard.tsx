@@ -308,7 +308,7 @@ export default function AdminDashboard() {
           <DialogHeader>
             <DialogTitle>Preuve de signature</DialogTitle>
           </DialogHeader>
-          {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} />}
+          {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} onClose={() => setReceiptDoc(null)} />}
         </DialogContent>
       </Dialog>
     </div>
