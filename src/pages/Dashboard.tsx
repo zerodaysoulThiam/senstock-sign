@@ -4,14 +4,18 @@ import { getCurrentUser, extractName } from '@/lib/auth';
 import { getDocuments, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
-import { PenTool, FileText, Calendar, Download, Plus } from 'lucide-react';
+import { PenTool, FileText, Calendar, Download, Plus, FileSignature } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import EmailShareMenu from '@/components/EmailShareMenu';
+import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getCurrentUser();
   const [docs, setDocs] = useState<SignedDocument[]>([]);
+  const [receiptDoc, setReceiptDoc] = useState<SignedDocument | null>(null);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -110,15 +114,30 @@ export default function Dashboard() {
                       </p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="icon" title="Télécharger" onClick={() => handleDownload(doc)} disabled={!doc.storagePath}>
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" title="Voir le journal de signature" onClick={() => setReceiptDoc(doc)}>
+                      <FileSignature className="h-4 w-4" />
+                    </Button>
+                    <EmailShareMenu fileName={doc.fileName} signerName={doc.signedByName} signedAt={doc.signedAt} variant="ghost" size="icon" iconOnly />
+                    <Button variant="ghost" size="icon" title="Télécharger" onClick={() => handleDownload(doc)} disabled={!doc.storagePath}>
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </motion.div>
               ))}
             </div>
           )}
         </div>
       </main>
+
+      <Dialog open={!!receiptDoc} onOpenChange={(o) => !o && setReceiptDoc(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Preuve de signature</DialogTitle>
+          </DialogHeader>
+          {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} />}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
