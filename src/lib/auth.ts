@@ -1,121 +1,125 @@
+import { supabase } from "@/integrations/supabase/client";
+
 export interface User {
+  id: string;
   email: string;
-  password: string;
-  role: 'admin' | 'user';
+  role: "admin" | "user";
   active: boolean;
+  full_name?: string;
 }
 
-const USERS_KEY = 'senstock_users';
-const CURRENT_USER_KEY = 'senstock_current_user';
-
-const DEFAULT_USERS: User[] = [
-  { email: 'admin@senstock.sn', password: 'admin123', role: 'admin', active: true },
-  { email: 'matar.thiam@senstock.sn', password: 'password123', role: 'user', active: true },
-  { email: 'fatou.diallo@senstock.sn', password: 'password123', role: 'user', active: true },
-  { email: 'ibrahima.ndiaye@senstock.sn', password: 'password123', role: 'user', active: true },
-  { email: 'aminata.sow@senstock.sn', password: 'password123', role: 'user', active: true },
-  { email: 'ousmane.ba@senstock.sn', password: 'password123', role: 'user', active: true },
-  { email: 'serigne.thiam@senstock.sn', password: 'passer123', role: 'user', active: true },
-];
+const CACHE_KEY = "senstock_current_user";
 
 function normalizeEmail(email: string) {
   return email.trim().toLowerCase();
 }
 
-function normalizePassword(password: string) {
-  return password.trim();
+export function extractName(email: string): string {
+  if (!email) return "";
+  const local = email.split("@")[0];
+  return local
+    .split(".")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1).toLowerCase())
+    .join(" ");
 }
 
-function normalizeUser(user: User): User {
-  return {
-    ...user,
-    email: normalizeEmail(user.email),
-    password: normalizePassword(user.password),
-    active: user.active !== false,
-  };
-}
-
-export function initUsers() {
-  const existing = localStorage.getItem(USERS_KEY);
-  if (!existing) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
-    return;
-  }
-  try {
-    const parsedUsers: User[] = JSON.parse(existing);
-    const users = parsedUsers.map(normalizeUser);
-    let changed = false;
-    if (JSON.stringify(users) !== JSON.stringify(parsedUsers)) changed = true;
-    for (const def of DEFAULT_USERS) {
-      if (!users.find(u => u.email.toLowerCase() === def.email.toLowerCase())) {
-        users.push(def);
-        changed = true;
-      }
-    }
-    if (changed) localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  } catch {
-    localStorage.setItem(USERS_KEY, JSON.stringify(DEFAULT_USERS));
-  }
-}
-
-export function getUsers(): User[] {
-  initUsers();
-  return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
-}
-
-export function login(email: string, password: string): User | null {
-  const users = getUsers();
-  const normalizedEmail = normalizeEmail(email);
-  const normalizedPassword = normalizePassword(password);
-  const user = users.find(u => normalizeEmail(u.email) === normalizedEmail && normalizePassword(u.password) === normalizedPassword && u.active);
-  if (user) {
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(normalizeUser(user)));
-    return user;
-  }
-  return null;
-}
-
-export function logout() {
-  localStorage.removeItem(CURRENT_USER_KEY);
+function setCache(u: User | null) {
+  if (u) localStorage.setItem(CACHE_KEY, JSON.stringify(u));
+  else localStorage.removeItem(CACHE_KEY);
 }
 
 export function getCurrentUser(): User | null {
-  const data = localStorage.getItem(CURRENT_USER_KEY);
-  return data ? JSON.parse(data) : null;
-}
-
-export function extractName(email: string): string {
-  const local = email.split('@')[0];
-  return local
-    .split('.')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
-    .join(' ');
-}
-
-export function addUser(email: string, password: string, role: 'admin' | 'user' = 'user') {
-  const users = getUsers();
-  const normalizedEmail = normalizeEmail(email);
-  const normalizedPassword = normalizePassword(password);
-  if (!normalizedEmail || !normalizedPassword) return 'invalid';
-  const existingUser = users.find(u => normalizeEmail(u.email) === normalizedEmail);
-  if (existingUser) {
-    existingUser.email = normalizedEmail;
-    existingUser.password = normalizedPassword;
-    existingUser.active = true;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users.map(normalizeUser)));
-    return 'updated';
+  const raw = localStorage.getItem(CACHE_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
   }
-  users.push({ email: normalizedEmail, password: normalizedPassword, role, active: true });
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
-  return 'created';
 }
 
-export function toggleUserActive(email: string) {
-  const users = getUsers();
-  const normalizedEmail = normalizeEmail(email);
-  const user = users.find(u => normalizeEmail(u.email) === normalizedEmail);
-  if (user && user.role !== 'admin') {
-    user.active = !user.active;
-    localStorage.setItem(USERS_KEY, JSON.stringify(users));
+async function hydrateFromSession(): Promise<User | null> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    setCache(null);
+    return null;
   }
+  const uid = session.user.id;
+  const [{ data: profile }, { data: roles }] = await Promise.all([
+    supabase.from("profiles").select("id, email, full_name, active").eq("id", uid).maybeSingle(),
+    supabase.from("user_roles").select("role").eq("user_id", uid),
+  ]);
+  const role = roles?.some((r) => r.role === "admin") ? "admin" : "user";
+  const user: User = {
+    id: uid,
+    email: profile?.email ?? session.user.email ?? "",
+    full_name: profile?.full_name ?? undefined,
+    role,
+    active: profile?.active !== false,
+  };
+  setCache(user);
+  return user;
+}
+
+/** Called once at boot: bootstraps defaults + hydrates the local cache. */
+export async function initSession(): Promise<User | null> {
+  try {
+    await supabase.functions.invoke("admin-users", { body: { action: "bootstrap" } });
+  } catch (e) {
+    console.warn("bootstrap failed (non-blocking)", e);
+  }
+  supabase.auth.onAuthStateChange((_e, session) => {
+    if (!session) setCache(null);
+    else hydrateFromSession().catch(() => {});
+  });
+  return await hydrateFromSession();
+}
+
+export async function login(email: string, password: string): Promise<User | null> {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: normalizeEmail(email),
+    password: password.trim(),
+  });
+  if (error || !data.user) return null;
+  return await hydrateFromSession();
+}
+
+export async function logout() {
+  await supabase.auth.signOut();
+  setCache(null);
+}
+
+export async function getUsers(): Promise<User[]> {
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body: { action: "list" },
+  });
+  if (error || !data?.users) return [];
+  return data.users.map((u: any) => ({
+    id: u.id,
+    email: u.email,
+    full_name: u.full_name,
+    role: u.role,
+    active: u.active,
+  }));
+}
+
+export async function addUser(
+  email: string,
+  password: string,
+  role: "admin" | "user" = "user"
+): Promise<"created" | "updated" | "invalid"> {
+  const normalizedEmail = normalizeEmail(email);
+  const normalizedPassword = password.trim();
+  if (!normalizedEmail || normalizedPassword.length < 6) return "invalid";
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body: { action: "create", email: normalizedEmail, password: normalizedPassword, role },
+  });
+  if (error || !data?.ok) return "invalid";
+  return data.updated ? "updated" : "created";
+}
+
+export async function toggleUserActive(userId: string) {
+  await supabase.functions.invoke("admin-users", {
+    body: { action: "toggle", userId },
+  });
 }

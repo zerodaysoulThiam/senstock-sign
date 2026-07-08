@@ -13,8 +13,8 @@ export default function AppHeader() {
   const name = extractName(user.email);
   const isAdmin = user.role === 'admin';
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     navigate('/login');
   };
 

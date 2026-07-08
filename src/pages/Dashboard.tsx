@@ -14,7 +14,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
-    setDocs(getDocuments(user.email));
+    getDocuments(user.email).then(setDocs).catch(() => setDocs([]));
   }, []);
 
   if (!user) return null;
