@@ -24,6 +24,8 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageSize, setPageSize] = useState<{ w: number; h: number } | null>(null); // PDF points
   const [displaySize, setDisplaySize] = useState<{ w: number; h: number }>({ w: 0, h: 0 }); // CSS px
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   // stamp state in CSS px, top-left origin
   const [stamp, setStamp] = useState({ x: 20, y: 20, w: 140, h: 70 });
   const [imgAspect, setImgAspect] = useState(2); // w/h
@@ -33,29 +35,40 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setLoading(true);
+      setError(null);
       const bytes = pdfBytes.slice(0);
-      const loadingTask = pdfjsLib.getDocument({ data: bytes });
-      const pdf = await loadingTask.promise;
-      const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
-      const page = await pdf.getPage(idx + 1);
-      const baseViewport = page.getViewport({ scale: 1 });
-      const container = containerRef.current;
-      const maxWidth = container ? container.clientWidth : 600;
-      const scale = Math.min(2, maxWidth / baseViewport.width);
-      const viewport = page.getViewport({ scale });
-      const canvas = canvasRef.current;
-      if (!canvas || cancelled) return;
-      const ratio = window.devicePixelRatio || 1;
-      canvas.width = viewport.width * ratio;
-      canvas.height = viewport.height * ratio;
-      canvas.style.width = `${viewport.width}px`;
-      canvas.style.height = `${viewport.height}px`;
-      const ctx = canvas.getContext('2d')!;
-      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-      await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
-      if (cancelled) return;
-      setPageSize({ w: baseViewport.width, h: baseViewport.height });
-      setDisplaySize({ w: viewport.width, h: viewport.height });
+      try {
+        const loadingTask = pdfjsLib.getDocument({ data: bytes });
+        const pdf = await loadingTask.promise;
+        const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
+        const page = await pdf.getPage(idx + 1);
+        const baseViewport = page.getViewport({ scale: 1 });
+        const container = containerRef.current;
+        const maxWidth = container ? container.clientWidth : 600;
+        const scale = Math.min(2, maxWidth / baseViewport.width);
+        const viewport = page.getViewport({ scale });
+        const canvas = canvasRef.current;
+        if (!canvas || cancelled) return;
+        const ratio = window.devicePixelRatio || 1;
+        canvas.width = viewport.width * ratio;
+        canvas.height = viewport.height * ratio;
+        canvas.style.width = `${viewport.width}px`;
+        canvas.style.height = `${viewport.height}px`;
+        const ctx = canvas.getContext('2d')!;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+        await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+        if (cancelled) return;
+        setPageSize({ w: baseViewport.width, h: baseViewport.height });
+        setDisplaySize({ w: viewport.width, h: viewport.height });
+        setLoading(false);
+      } catch (err) {
+        console.error('PDF render error:', err);
+        if (!cancelled) {
+          setError("Impossible d'afficher l'aperçu du PDF. Vous pouvez tout de même signer.");
+          setLoading(false);
+        }
+      }
     })();
     return () => { cancelled = true; };
   }, [pdfBytes, pageIndex]);
@@ -132,8 +145,18 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
       <div
         ref={containerRef}
         className="relative mx-auto border rounded-lg overflow-hidden bg-muted/30 select-none touch-none"
-        style={{ width: displaySize.w || '100%', maxWidth: '100%' }}
+        style={{ width: displaySize.w || '100%', maxWidth: '100%', minHeight: displaySize.w ? undefined : 400 }}
       >
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground">
+            Chargement de l'aperçu…
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 flex items-center justify-center text-sm text-destructive p-4 text-center">
+            {error}
+          </div>
+        )}
         <canvas ref={canvasRef} className="block" />
         {displaySize.w > 0 && (
           <div
