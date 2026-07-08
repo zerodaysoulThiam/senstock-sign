@@ -1,4 +1,5 @@
-import { CheckCircle2, ShieldCheck, Fingerprint, Mail, Calendar, Clock, Monitor, FileText, PenTool, Hash, MapPin } from 'lucide-react';
+import { CheckCircle2, ShieldCheck, Fingerprint, Mail, Calendar, Clock, Monitor, FileText, PenTool, Hash, MapPin, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface SignatureReceiptData {
   signatureId: string;
