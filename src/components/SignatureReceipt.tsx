@@ -84,7 +84,7 @@ export function receiptFromDoc(doc: {
   };
 }
 
-export default function SignatureReceipt({ data }: { data: SignatureReceiptData }) {
+export default function SignatureReceipt({ data, onClose }: { data: SignatureReceiptData; onClose?: () => void }) {
   const rows: { icon: any; label: string; value: string }[] = [
     { icon: Hash, label: 'ID de signature', value: data.signatureId },
     { icon: PenTool, label: 'Nom du signataire', value: data.signerName },
