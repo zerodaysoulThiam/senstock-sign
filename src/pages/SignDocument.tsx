@@ -108,7 +108,16 @@ export default function SignDocument() {
         stampType,
         signerName,
         position,
-        placement ? { x: placement.x, y: placement.y, width: placement.width } : undefined
+        placement ? {
+          x: placement.x,
+          y: placement.y,
+          width: placement.width,
+          xRatio: placement.x / placement.pageWidth,
+          yRatio: placement.y / placement.pageHeight,
+          widthRatio: placement.width / placement.pageWidth,
+          refPageWidth: placement.pageWidth,
+          refPageHeight: placement.pageHeight,
+        } : undefined
       );
       const blob = new Blob([signedPdf.buffer as ArrayBuffer], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
