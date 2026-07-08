@@ -148,7 +148,7 @@ export default function SignDocument() {
           signedAt: new Date().toISOString(),
           signaturePosition: position,
           pageCount,
-        });
+        }, blob);
       } catch (e) {
         console.error('saveDocument failed', e);
         toast.error("Document signé mais non sauvegardé dans le cloud");
