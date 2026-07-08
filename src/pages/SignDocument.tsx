@@ -7,7 +7,7 @@ import AppHeader from '@/components/AppHeader';
 import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2 } from 'lucide-react';
+import { Upload, FileText, Image, CheckCircle, Download, ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
@@ -168,6 +168,14 @@ export default function SignDocument() {
     a.href = signedPdfUrl;
     a.download = signedFileName;
     a.click();
+  };
+
+  const handleSendEmail = () => {
+    const subject = encodeURIComponent(`Document signé : ${signedFileName}`);
+    const body = encodeURIComponent(
+      `Bonjour,\n\nVeuillez trouver ci-joint le document "${signedFileName}" signé électroniquement par ${signerName} le ${new Date().toLocaleDateString('fr-FR')}.\n\nN'oubliez pas de joindre manuellement le PDF téléchargé à cet e-mail avant de l'envoyer.\n\nCordialement,\n${signerName}`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   const positionOptions: { value: SignaturePosition; label: string; desc: string }[] = [
@@ -366,7 +374,11 @@ export default function SignDocument() {
                   <Download className="h-4 w-4" />
                   Télécharger le PDF signé
                 </Button>
-                <Button variant="outline" onClick={() => {
+                <Button variant="outline" onClick={handleSendEmail} className="gap-2">
+                  <Mail className="h-4 w-4" />
+                  Envoyer par e-mail
+                </Button>
+                <Button variant="ghost" onClick={() => {
                   setStep('upload');
                   setPdfFile(null);
                   setPdfUrl('');
