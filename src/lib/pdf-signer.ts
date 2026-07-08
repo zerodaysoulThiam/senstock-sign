@@ -1,4 +1,4 @@
-import { PDFDocument } from 'pdf-lib';
+import { PDFDocument, degrees } from 'pdf-lib';
 
 export type SignaturePosition = 'first' | 'last' | 'all' | 'middle';
 
@@ -37,36 +37,71 @@ export async function signPDF(
 
   for (const pageIndex of pagesToSign) {
     const page = pages[pageIndex];
-    const { width: pw, height: ph } = page.getSize();
+    // Unrotated page dimensions (what pdf-lib draws in)
+    const { width: Wu, height: Hu } = page.getSize();
+    // Page /Rotate — display rotation applied at view time (0/90/180/270 CW)
+    const rot = ((page.getRotation().angle % 360) + 360) % 360;
+    const sideways = rot === 90 || rot === 270;
+    // Visible dimensions (what the user saw in the preview and what ratios refer to)
+    const Wv = sideways ? Hu : Wu;
+    const Hv = sideways ? Wu : Hu;
+    const aspect = stampImage.height / stampImage.width;
 
-    let stampWidth: number;
-    let x: number;
-    let y: number;
+    // Compute stamp size + visible bottom-left (xv, yv) target
+    let sw: number; // visible stamp width
+    let sh: number; // visible stamp height
+    let xv: number;
+    let yv: number;
     if (placement && placement.widthRatio != null && placement.xRatio != null && placement.yRatio != null) {
-      // Ratio-based placement — consistent across pages of different sizes
-      stampWidth = placement.widthRatio * pw;
-      const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
-      x = placement.xRatio * pw;
-      y = placement.yRatio * ph;
-      x = Math.max(0, Math.min(x, pw - stampWidth));
-      y = Math.max(0, Math.min(y, ph - stampHeight));
+      sw = placement.widthRatio * Wv;
+      sh = aspect * sw;
+      xv = placement.xRatio * Wv;
+      yv = placement.yRatio * Hv;
     } else if (placement) {
-      stampWidth = placement.width;
-      const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
-      x = Math.max(0, Math.min(placement.x, pw - stampWidth));
-      y = Math.max(0, Math.min(placement.y, ph - stampHeight));
+      sw = placement.width;
+      sh = aspect * sw;
+      xv = placement.x;
+      yv = placement.y;
     } else {
-      stampWidth = 120;
-      x = pw - stampWidth - 50;
-      y = 50;
+      sw = 120;
+      sh = aspect * sw;
+      xv = Wv - sw - 50;
+      yv = 50;
     }
-    const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
+    // Clamp inside the visible page
+    xv = Math.max(0, Math.min(xv, Wv - sw));
+    yv = Math.max(0, Math.min(yv, Hv - sh));
+
+    // Map (xv, yv) in VISIBLE bottom-left space to the DRAW coords
+    // (unrotated page) + a matching drawImage rotation so the stamp
+    // appears upright at the intended visible position regardless of
+    // the page's /Rotate value.
+    let dx: number, dy: number;
+    switch (rot) {
+      case 90:
+        dx = Wu - yv;
+        dy = xv;
+        break;
+      case 180:
+        dx = Wu - xv;
+        dy = Hu - yv;
+        break;
+      case 270:
+        dx = yv;
+        dy = Hu - xv;
+        break;
+      case 0:
+      default:
+        dx = xv;
+        dy = yv;
+    }
 
     page.drawImage(stampImage, {
-      x,
-      y,
-      width: stampWidth,
-      height: stampHeight,
+      x: dx,
+      y: dy,
+      width: sw,
+      height: sh,
+      rotate: degrees(rot),
     });
   }
 
