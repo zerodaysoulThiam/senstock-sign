@@ -51,15 +51,27 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
         const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
         const page = await pdf.getPage(idx + 1);
         const baseViewport = page.getViewport({ scale: 1 });
-        const container = containerRef.current;
-        const maxWidth = container ? container.clientWidth : 600;
-        const scale = Math.min(2, maxWidth / baseViewport.width);
+        // Wait for the container to have a real width (mobile: layout can be 0 on first tick)
+        let container = containerRef.current;
+        let tries = 0;
+        while ((!container || container.clientWidth < 50) && tries < 20 && !cancelled) {
+          await new Promise(r => setTimeout(r, 50));
+          container = containerRef.current;
+          tries++;
+        }
+        if (cancelled) return;
+        const maxWidth = Math.max(280, container ? container.clientWidth : (window.innerWidth - 32));
+        const isMobile = window.innerWidth < 768;
+        const maxScale = isMobile ? 1.4 : 2;
+        const scale = Math.min(maxScale, maxWidth / baseViewport.width);
         const viewport = page.getViewport({ scale });
         const canvas = canvasRef.current;
         if (!canvas || cancelled) return;
-        const ratio = window.devicePixelRatio || 1;
-        canvas.width = viewport.width * ratio;
-        canvas.height = viewport.height * ratio;
+        // Cap DPR on mobile to avoid oversized canvases that fail to render.
+        const rawRatio = window.devicePixelRatio || 1;
+        const ratio = Math.min(rawRatio, isMobile ? 1.5 : 2);
+        canvas.width = Math.floor(viewport.width * ratio);
+        canvas.height = Math.floor(viewport.height * ratio);
         canvas.style.width = `${viewport.width}px`;
         canvas.style.height = `${viewport.height}px`;
         const ctx = canvas.getContext('2d')!;
@@ -72,8 +84,30 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
       } catch (err) {
         console.error('PDF render error:', err);
         if (!cancelled) {
-          setError("Impossible d'afficher l'aperçu du PDF. Vous pouvez tout de même signer.");
-          setLoading(false);
+          // Retry once with a very conservative render (small canvas, no DPR).
+          try {
+            const pdf = pdfRef.current!;
+            const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
+            const page = await pdf.getPage(idx + 1);
+            const base = page.getViewport({ scale: 1 });
+            const fallbackWidth = Math.max(280, Math.min(window.innerWidth - 32, 600));
+            const viewport = page.getViewport({ scale: fallbackWidth / base.width });
+            const canvas = canvasRef.current!;
+            canvas.width = Math.floor(viewport.width);
+            canvas.height = Math.floor(viewport.height);
+            canvas.style.width = `${viewport.width}px`;
+            canvas.style.height = `${viewport.height}px`;
+            const ctx = canvas.getContext('2d')!;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            await page.render({ canvasContext: ctx, viewport, canvas } as any).promise;
+            setPageSize({ w: base.width, h: base.height });
+            setDisplaySize({ w: viewport.width, h: viewport.height });
+            setLoading(false);
+          } catch (err2) {
+            console.error('PDF fallback render error:', err2);
+            setError("Impossible d'afficher l'aperçu du PDF. Vous pouvez tout de même signer.");
+            setLoading(false);
+          }
         }
       }
     })();
