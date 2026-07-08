@@ -34,6 +34,7 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   const [imgAspect, setImgAspect] = useState(2); // w/h
   const dragRef = useRef<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
   const restoredForSizeRef = useRef<string>('');
+  const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
 
   // Render the PDF page
   useEffect(() => {
@@ -41,10 +42,12 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
     (async () => {
       setLoading(true);
       setError(null);
-      const bytes = pdfBytes.slice(0);
       try {
-        const loadingTask = pdfjsLib.getDocument({ data: bytes });
-        const pdf = await loadingTask.promise;
+        if (!pdfRef.current) {
+          const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
+          pdfRef.current = await loadingTask.promise;
+        }
+        const pdf = pdfRef.current;
         const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
         const page = await pdf.getPage(idx + 1);
         const baseViewport = page.getViewport({ scale: 1 });
@@ -76,6 +79,16 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
     })();
     return () => { cancelled = true; };
   }, [pdfBytes, pageIndex]);
+
+  useEffect(() => {
+    pdfRef.current?.destroy();
+    pdfRef.current = null;
+    restoredForSizeRef.current = '';
+    return () => {
+      pdfRef.current?.destroy();
+      pdfRef.current = null;
+    };
+  }, [pdfBytes]);
 
   // Restore persisted ratio placement whenever the page (re)renders at a
   // new display size. Uses ratios so it lands at the same visual spot
