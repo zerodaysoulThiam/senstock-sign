@@ -31,6 +31,7 @@ export default function SignDocument() {
   const [placement, setPlacement] = useState<PlacementResult | null>(null);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(0);
+  const initialPageChosenRef = useRef(false);
   const [signing, setSigning] = useState(false);
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
   const [signedFileName, setSignedFileName] = useState('');
@@ -59,17 +60,24 @@ export default function SignDocument() {
     setStep('stamp');
   };
 
-  // When entering position step, choose the preview page based on position
+  // Choose preview page ONCE per entry into position step, and only after
+  // pageCount is known. This prevents the placer from remounting (and
+  // resetting the stamp position) when pageCount loads late on heavy PDFs.
   useEffect(() => {
-    if (step !== 'position') return;
-    // We derive page count from placement via first render; fallback 1
-    const total = pageCount || 1;
+    if (step !== 'position') {
+      initialPageChosenRef.current = false;
+      return;
+    }
+    if (initialPageChosenRef.current) return;
+    if (!pageCount) return; // wait until we know the real page count
+    const total = pageCount;
     let idx = 0;
     if (position === 'first') idx = 0;
     else if (position === 'last') idx = total - 1;
     else if (position === 'middle') idx = Math.floor(total / 2);
     else if (position === 'all') idx = 0;
     setPreviewPageIndex(idx);
+    initialPageChosenRef.current = true;
   }, [step, position, pageCount]);
 
   // Extract page count once PDF loaded
