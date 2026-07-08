@@ -4,9 +4,10 @@ import { login } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { PenTool, Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle } from 'lucide-react'; // PenTool retiré
 import { motion } from 'framer-motion';
 import loginBg from '@/assets/login-bg.jpg';
+import senstockLogo from '@/assets/senstock-logo.jpg'; // Import du logo
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -48,8 +49,12 @@ export default function Login() {
         <div className="glass rounded-2xl p-8 shadow-2xl">
           {/* Logo */}
           <div className="text-center mb-8">
-            <div className="inline-flex h-14 w-14 rounded-xl brand-gradient items-center justify-center mb-4 shadow-lg">
-              <PenTool className="h-7 w-7 text-primary-foreground" />
+            <div className="inline-flex h-14 w-14 rounded-xl brand-gradient items-center justify-center mb-4 shadow-lg overflow-hidden">
+              <img
+                src={senstockLogo}
+                alt="SENSTOCK"
+                className="h-full w-full object-contain"
+              />
             </div>
             <h1 className="text-2xl font-bold text-gradient">SENSTOCK</h1>
             <p className="text-sm text-muted-foreground mt-1">Plateforme de Signature Électronique</p>

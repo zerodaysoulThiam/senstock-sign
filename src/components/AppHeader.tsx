@@ -2,6 +2,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, extractName, logout } from '@/lib/auth';
 import { LogOut, FileText, Shield, PenTool } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import senstockLogo from '@/assets/senstock-logo.jpg'; // Import du logo
 
 export default function AppHeader() {
   const navigate = useNavigate();
@@ -29,8 +30,12 @@ export default function AppHeader() {
       <div className="container flex h-16 items-center justify-between">
         <div className="flex items-center gap-8">
           <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg brand-gradient flex items-center justify-center">
-              <PenTool className="h-4 w-4 text-primary-foreground" />
+            <div className="h-8 w-8 rounded-lg brand-gradient flex items-center justify-center overflow-hidden">
+              <img
+                src={senstockLogo}
+                alt="SENSTOCK"
+                className="h-full w-full object-contain"
+              />
             </div>
             <span className="text-lg font-semibold text-gradient">SENSTOCK</span>
           </button>
