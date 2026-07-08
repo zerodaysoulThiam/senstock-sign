@@ -7,6 +7,14 @@ export interface StampPlacement {
   x: number;
   y: number;
   width: number; // in PDF points
+  // Optional ratios relative to the preview page size. When provided,
+  // the placement is re-computed per page so it stays at the same visual
+  // spot regardless of individual page dimensions.
+  xRatio?: number; // x / pageWidth
+  yRatio?: number; // y / pageHeight (bottom-left origin)
+  widthRatio?: number; // width / pageWidth
+  refPageWidth?: number;
+  refPageHeight?: number;
 }
 
 export async function signPDF(
@@ -31,18 +39,28 @@ export async function signPDF(
     const page = pages[pageIndex];
     const { width: pw, height: ph } = page.getSize();
 
-    const stampWidth = placement?.width ?? 120;
-    const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
-
+    let stampWidth: number;
     let x: number;
     let y: number;
-    if (placement) {
+    if (placement && placement.widthRatio != null && placement.xRatio != null && placement.yRatio != null) {
+      // Ratio-based placement — consistent across pages of different sizes
+      stampWidth = placement.widthRatio * pw;
+      const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
+      x = placement.xRatio * pw;
+      y = placement.yRatio * ph;
+      x = Math.max(0, Math.min(x, pw - stampWidth));
+      y = Math.max(0, Math.min(y, ph - stampHeight));
+    } else if (placement) {
+      stampWidth = placement.width;
+      const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
       x = Math.max(0, Math.min(placement.x, pw - stampWidth));
       y = Math.max(0, Math.min(placement.y, ph - stampHeight));
     } else {
+      stampWidth = 120;
       x = pw - stampWidth - 50;
       y = 50;
     }
+    const stampHeight = (stampImage.height / stampImage.width) * stampWidth;
 
     page.drawImage(stampImage, {
       x,
