@@ -17,9 +17,12 @@ interface Props {
   pageIndex: number; // 0-based
   stampSrc: string;
   onChange: (p: PlacementResult) => void;
+  // Persisted ratio-based placement so switching preview page or
+  // late PDF loads (heavy files) do not reset the stamp position.
+  initialRatio?: { xRatio: number; yRatio: number; widthRatio: number } | null;
 }
 
-export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange }: Props) {
+export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange, initialRatio }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [pageSize, setPageSize] = useState<{ w: number; h: number } | null>(null); // PDF points
@@ -30,6 +33,7 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   const [stamp, setStamp] = useState({ x: 20, y: 20, w: 140, h: 70 });
   const [imgAspect, setImgAspect] = useState(2); // w/h
   const dragRef = useRef<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
+  const restoredForSizeRef = useRef<string>('');
 
   // Render the PDF page
   useEffect(() => {
@@ -72,6 +76,25 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
     })();
     return () => { cancelled = true; };
   }, [pdfBytes, pageIndex]);
+
+  // Restore persisted ratio placement whenever the page (re)renders at a
+  // new display size. Uses ratios so it lands at the same visual spot
+  // even if page dimensions differ.
+  useEffect(() => {
+    if (displaySize.w === 0) return;
+    const key = `${displaySize.w}x${displaySize.h}:${pageIndex}`;
+    if (restoredForSizeRef.current === key) return;
+    restoredForSizeRef.current = key;
+    if (initialRatio) {
+      const w = Math.max(40, initialRatio.widthRatio * displaySize.w);
+      const h = w / imgAspect;
+      const x = Math.max(0, Math.min(initialRatio.xRatio * displaySize.w, displaySize.w - w));
+      // yRatio uses PDF bottom-left origin; convert to CSS top-left
+      const yFromBottomCss = (1 - initialRatio.yRatio) * displaySize.h - h;
+      const y = Math.max(0, Math.min(yFromBottomCss, displaySize.h - h));
+      setStamp({ x, y, w, h });
+    }
+  }, [displaySize, pageIndex, initialRatio, imgAspect]);
 
   // Load stamp aspect
   useEffect(() => {
