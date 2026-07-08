@@ -140,14 +140,19 @@ export default function SignDocument() {
       const fileName = `signé_${pdfFile.name}`;
       setSignedFileName(fileName);
 
-      saveDocument({
-        fileName: pdfFile.name,
-        signedBy: user.email,
-        signedByName: signerName,
-        signedAt: new Date().toISOString(),
-        signaturePosition: position,
-        pageCount,
-      });
+      try {
+        await saveDocument({
+          fileName: pdfFile.name,
+          signedBy: user.email,
+          signedByName: signerName,
+          signedAt: new Date().toISOString(),
+          signaturePosition: position,
+          pageCount,
+        });
+      } catch (e) {
+        console.error('saveDocument failed', e);
+        toast.error("Document signé mais non sauvegardé dans le cloud");
+      }
 
       setStep('done');
       toast.success('Document signé avec succès !');
