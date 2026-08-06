@@ -87,6 +87,40 @@ async function isCallerAdmin(authHeader: string | null): Promise<{ ok: boolean; 
   return { ok: isAdmin, userId: data.user.id };
 }
 
+/** Removes a user's documents, stored files, profile, roles and auth account. */
+async function deleteUserCascade(userId: string) {
+  const { data: docs } = await admin
+    .from("documents")
+    .select("id, storage_path")
+    .eq("owner_id", userId);
+  const paths = (docs ?? []).map((d: any) => d.storage_path).filter(Boolean);
+  if (paths.length > 0) {
+    await admin.storage.from("signed-documents").remove(paths);
+  }
+  await admin.from("documents").delete().eq("owner_id", userId);
+  await admin.from("user_roles").delete().eq("user_id", userId);
+  await admin.from("profiles").delete().eq("id", userId);
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw error;
+}
+
+async function unusedIsCallerAdmin(authHeader: string | null): Promise<{ ok: boolean; userId?: string }> {
+  if (!authHeader) return { ok: false };
+  const token = authHeader.replace(/^Bearer\s+/i, "");
+  const client = createClient(SUPABASE_URL, ANON_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await client.auth.getUser();
+  if (error || !data.user) return { ok: false };
+  const { data: roles } = await admin
+    .from("user_roles")
+    .select("role")
+    .eq("user_id", data.user.id);
+  const isAdmin = !!roles?.some((r) => r.role === "admin");
+  return { ok: isAdmin, userId: data.user.id };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
