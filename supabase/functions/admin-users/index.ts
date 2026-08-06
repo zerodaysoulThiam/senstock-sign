@@ -18,12 +18,6 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
 
 const DEFAULT_USERS = [
   { email: "admin@senstock.sn", password: "admin123", role: "admin" as const },
-  { email: "matar.thiam@senstock.sn", password: "password123", role: "user" as const },
-  { email: "fatou.diallo@senstock.sn", password: "password123", role: "user" as const },
-  { email: "ibrahima.ndiaye@senstock.sn", password: "password123", role: "user" as const },
-  { email: "aminata.sow@senstock.sn", password: "password123", role: "user" as const },
-  { email: "ousmane.ba@senstock.sn", password: "password123", role: "user" as const },
-  { email: "serigne.thiam@senstock.sn", password: "passer123", role: "user" as const },
 ];
 
 function extractName(email: string) {
@@ -91,6 +85,23 @@ async function isCallerAdmin(authHeader: string | null): Promise<{ ok: boolean; 
     .eq("user_id", data.user.id);
   const isAdmin = !!roles?.some((r) => r.role === "admin");
   return { ok: isAdmin, userId: data.user.id };
+}
+
+/** Removes a user's documents, stored files, profile, roles and auth account. */
+async function deleteUserCascade(userId: string) {
+  const { data: docs } = await admin
+    .from("documents")
+    .select("id, storage_path")
+    .eq("owner_id", userId);
+  const paths = (docs ?? []).map((d: any) => d.storage_path).filter(Boolean);
+  if (paths.length > 0) {
+    await admin.storage.from("signed-documents").remove(paths);
+  }
+  await admin.from("documents").delete().eq("owner_id", userId);
+  await admin.from("user_roles").delete().eq("user_id", userId);
+  await admin.from("profiles").delete().eq("id", userId);
+  const { error } = await admin.auth.admin.deleteUser(userId);
+  if (error) throw error;
 }
 
 Deno.serve(async (req) => {
@@ -189,6 +200,74 @@ Deno.serve(async (req) => {
         ban_duration: nextActive ? "none" : "876000h",
       } as any);
       return new Response(JSON.stringify({ ok: true, active: nextActive }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "set-password") {
+      const userId = String(body.userId ?? "");
+      const password = String(body.password ?? "").trim();
+      if (!userId || password.length < 6) {
+        return new Response(
+          JSON.stringify({ error: "Mot de passe trop court (min 6 caractères)." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      const { error } = await admin.auth.admin.updateUserById(userId, { password });
+      if (error) throw error;
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "delete") {
+      const userId = String(body.userId ?? "");
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "userId requis" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (userId === check.userId) {
+        return new Response(
+          JSON.stringify({ error: "Vous ne pouvez pas supprimer votre propre compte." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      // Refuse to delete another admin account
+      const { data: targetRoles } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", userId);
+      if (targetRoles?.some((r) => r.role === "admin")) {
+        return new Response(
+          JSON.stringify({ error: "Impossible de supprimer un compte administrateur." }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      await deleteUserCascade(userId);
+      return new Response(JSON.stringify({ ok: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "purge-non-admins") {
+      const { data: profiles } = await admin.from("profiles").select("id");
+      const { data: roles } = await admin.from("user_roles").select("user_id, role");
+      const adminIds = new Set(
+        (roles ?? []).filter((r) => r.role === "admin").map((r) => r.user_id)
+      );
+      let deleted = 0;
+      for (const p of profiles ?? []) {
+        if (adminIds.has(p.id)) continue;
+        try {
+          await deleteUserCascade(p.id);
+          deleted++;
+        } catch (e) {
+          console.error("purge failed", p.id, e);
+        }
+      }
+      return new Response(JSON.stringify({ ok: true, deleted }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }

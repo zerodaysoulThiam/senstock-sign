@@ -123,3 +123,33 @@ export async function toggleUserActive(userId: string) {
     body: { action: "toggle", userId },
   });
 }
+
+/** Admin: définit un nouveau mot de passe pour un utilisateur. */
+export async function setUserPassword(userId: string, password: string): Promise<boolean> {
+  const pwd = password.trim();
+  if (pwd.length < 6) return false;
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body: { action: "set-password", userId, password: pwd },
+  });
+  return !error && !!data?.ok;
+}
+
+/** Admin: supprime définitivement un utilisateur et ses documents. */
+export async function deleteUser(userId: string): Promise<{ ok: boolean; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body: { action: "delete", userId },
+  });
+  if (error) return { ok: false, error: error.message };
+  if (!data?.ok) return { ok: false, error: data?.error ?? "Suppression impossible" };
+  return { ok: true };
+}
+
+/** Admin: supprime tous les comptes non-administrateurs. */
+export async function purgeNonAdminUsers(): Promise<{ ok: boolean; deleted?: number; error?: string }> {
+  const { data, error } = await supabase.functions.invoke("admin-users", {
+    body: { action: "purge-non-admins" },
+  });
+  if (error) return { ok: false, error: error.message };
+  if (!data?.ok) return { ok: false, error: data?.error ?? "Suppression impossible" };
+  return { ok: true, deleted: data.deleted };
+}

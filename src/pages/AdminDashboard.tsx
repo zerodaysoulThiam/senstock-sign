@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCurrentUser, getUsers, extractName, addUser, toggleUserActive, type User } from '@/lib/auth';
+import { getCurrentUser, getUsers, extractName, addUser, toggleUserActive, setUserPassword, deleteUser, purgeNonAdminUsers, type User } from '@/lib/auth';
 import { getDocuments, getStats, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature } from 'lucide-react';
+import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature, Trash2, KeyRound } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 
 type Tab = 'documents' | 'users' | 'stats';
 
@@ -36,6 +36,9 @@ export default function AdminDashboard() {
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [receiptDoc, setReceiptDoc] = useState<SignedDocument | null>(null);
+  const [pwdTarget, setPwdTarget] = useState<User | null>(null);
+  const [pwdValue, setPwdValue] = useState('');
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') { navigate('/login'); return; }
@@ -68,6 +71,47 @@ export default function AdminDashboard() {
   const handleToggle = async (userId: string) => {
     await toggleUserActive(userId);
     await reload();
+  };
+
+  const handleSetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pwdTarget) return;
+    setBusy(true);
+    const ok = await setUserPassword(pwdTarget.id, pwdValue);
+    setBusy(false);
+    if (ok) {
+      toast.success(`Mot de passe modifié pour ${pwdTarget.email}`);
+      setPwdTarget(null);
+      setPwdValue('');
+    } else {
+      toast.error('Mot de passe trop court (min 6 caractères) ou erreur');
+    }
+  };
+
+  const handleDelete = async (u: User) => {
+    if (!confirm(`Supprimer définitivement le compte ${u.email} et tous ses documents ?`)) return;
+    setBusy(true);
+    const res = await deleteUser(u.id);
+    setBusy(false);
+    if (res.ok) {
+      toast.success('Compte supprimé');
+      await reload();
+    } else {
+      toast.error(res.error || 'Suppression impossible');
+    }
+  };
+
+  const handlePurge = async () => {
+    if (!confirm("Supprimer TOUS les comptes sauf les administrateurs (et leurs documents) ? Cette action est irréversible.")) return;
+    setBusy(true);
+    const res = await purgeNonAdminUsers();
+    setBusy(false);
+    if (res.ok) {
+      toast.success(`${res.deleted ?? 0} compte(s) supprimé(s)`);
+      await reload();
+    } else {
+      toast.error(res.error || 'Suppression impossible');
+    }
   };
 
   const tabs = [
@@ -162,10 +206,16 @@ export default function AdminDashboard() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
             {/* Add User Form */}
             <div className="bg-card rounded-xl border p-6">
-              <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                <UserPlus className="h-4 w-4" />
-                Ajouter un utilisateur
-              </h3>
+              <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  Ajouter un utilisateur
+                </h3>
+                <Button variant="outline" size="sm" className="gap-2 text-destructive" disabled={busy} onClick={handlePurge}>
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Supprimer tous les comptes sauf admin
+                </Button>
+              </div>
               <form onSubmit={handleAddUser} className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
                   <Label htmlFor="newemail" className="sr-only">Email</Label>
@@ -211,12 +261,24 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="p-3 text-right">
-                        {u.role !== 'admin' && (
-                          <Button variant="ghost" size="sm" onClick={() => handleToggle(u.id)} className="gap-1 text-xs">
-                            {u.active ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
-                            {u.active ? 'Désactiver' : 'Activer'}
+                        <div className="inline-flex items-center gap-1 flex-wrap justify-end">
+                          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => { setPwdTarget(u); setPwdValue(''); }}>
+                            <KeyRound className="h-3 w-3" />
+                            Mot de passe
                           </Button>
-                        )}
+                          {u.role !== 'admin' && (
+                            <>
+                              <Button variant="ghost" size="sm" onClick={() => handleToggle(u.id)} className="gap-1 text-xs">
+                                {u.active ? <UserX className="h-3 w-3" /> : <UserCheck className="h-3 w-3" />}
+                                {u.active ? 'Désactiver' : 'Activer'}
+                              </Button>
+                              <Button variant="ghost" size="sm" disabled={busy} onClick={() => handleDelete(u)} className="gap-1 text-xs text-destructive">
+                                <Trash2 className="h-3 w-3" />
+                                Supprimer
+                              </Button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -306,6 +368,28 @@ export default function AdminDashboard() {
       <Dialog open={!!receiptDoc} onOpenChange={(o) => !o && setReceiptDoc(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-4 sm:p-6">
           {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} onClose={() => setReceiptDoc(null)} />}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!pwdTarget} onOpenChange={(o) => { if (!o) { setPwdTarget(null); setPwdValue(''); } }}>
+        <DialogContent className="max-w-sm p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base">Changer le mot de passe</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSetPassword} className="space-y-4">
+            <p className="text-sm text-muted-foreground">{pwdTarget?.email}</p>
+            <div className="space-y-2">
+              <Label htmlFor="setpwd">Nouveau mot de passe</Label>
+              <Input id="setpwd" type="text" minLength={6} required value={pwdValue}
+                onChange={(e) => setPwdValue(e.target.value)} placeholder="min. 6 caractères" />
+            </div>
+            <DialogFooter>
+              <Button type="submit" disabled={busy} className="gap-2">
+                <KeyRound className="h-4 w-4" />
+                Enregistrer
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>
