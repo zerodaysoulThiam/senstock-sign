@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, extractName, logout } from '@/lib/auth';
-import { LogOut, FileText, Shield, PenTool } from 'lucide-react';
+import { LogOut, FileText, Shield, PenTool, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import senstockLogo from '@/assets/senstock-logo.jpg'; // Import du logo
 
 export default function AppHeader() {
   const navigate = useNavigate();
   const location = useLocation();
   const user = getCurrentUser();
+  const [pwdOpen, setPwdOpen] = useState(false);
 
   if (!user) return null;
 
@@ -64,11 +67,15 @@ export default function AppHeader() {
           <div className="h-9 w-9 rounded-full bg-accent flex items-center justify-center text-sm font-semibold text-accent-foreground">
             {name.split(' ').map(n => n[0]).join('')}
           </div>
+          <Button variant="ghost" size="icon" onClick={() => setPwdOpen(true)} title="Changer mon mot de passe">
+            <KeyRound className="h-4 w-4" />
+          </Button>
           <Button variant="ghost" size="icon" onClick={handleLogout} title="Déconnexion">
             <LogOut className="h-4 w-4" />
           </Button>
         </div>
       </div>
+      <ChangePasswordDialog open={pwdOpen} onOpenChange={setPwdOpen} />
     </header>
   );
 }
