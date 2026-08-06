@@ -18,12 +18,6 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE, {
 
 const DEFAULT_USERS = [
   { email: "admin@senstock.sn", password: "admin123", role: "admin" as const },
-  { email: "matar.thiam@senstock.sn", password: "password123", role: "user" as const },
-  { email: "fatou.diallo@senstock.sn", password: "password123", role: "user" as const },
-  { email: "ibrahima.ndiaye@senstock.sn", password: "password123", role: "user" as const },
-  { email: "aminata.sow@senstock.sn", password: "password123", role: "user" as const },
-  { email: "ousmane.ba@senstock.sn", password: "password123", role: "user" as const },
-  { email: "serigne.thiam@senstock.sn", password: "passer123", role: "user" as const },
 ];
 
 function extractName(email: string) {
