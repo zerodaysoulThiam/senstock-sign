@@ -162,11 +162,11 @@ export default function SignDocument() {
 
   const handleSign = async () => {
     if (!pdfBytes || !stampBytes || !pdfFile) return;
-    const lockedPlacement = placementRef.current ?? placement;
-    if (!lockedPlacement) {
-      toast.error('Veuillez positionner le cachet sur le document avant de signer');
-      return;
-    }
+    // Si l'aperçu n'a pas pu s'afficher, on retombe sur le coin bas-droite
+    // par défaut au lieu de bloquer la signature.
+    const lockedPlacement = placementRef.current ?? placement ?? {
+      x: 0.66 * 595, y: 0.04 * 842, width: 0.28 * 595, pageWidth: 595, pageHeight: 842,
+    };
     setSigning(true);
     try {
       const { signedPdf, pageCount } = await signPDF(
@@ -304,7 +304,13 @@ export default function SignDocument() {
                     </p>
                   </div>
                   <object data={pdfUrl} type="application/pdf" className="w-full h-[500px]">
-                    <p className="p-4 text-sm text-muted-foreground">Aperçu PDF non disponible</p>
+                    <div className="p-4 text-sm text-muted-foreground space-y-2">
+                      <p>Votre navigateur ne peut pas afficher le PDF ici.</p>
+                      <a href={pdfUrl} target="_blank" rel="noreferrer" className="text-primary underline">
+                        Ouvrir le document dans un nouvel onglet
+                      </a>
+                      <p>L'aperçu complet avec placement du cachet reste disponible à l'étape suivante.</p>
+                    </div>
                   </object>
                 </div>
 
