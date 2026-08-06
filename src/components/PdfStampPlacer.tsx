@@ -36,6 +36,7 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   const restoredForSizeRef = useRef<string>('');
   const defaultPlacedRef = useRef(false);
   const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
+  const bytesKeyRef = useRef<ArrayBuffer | null>(null);
 
   // Render the PDF page
   useEffect(() => {
@@ -44,6 +45,13 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
       setLoading(true);
       setError(null);
       try {
+        // Nouveau document : on repart d'un doc pdf.js propre.
+        if (bytesKeyRef.current !== pdfBytes) {
+          (pdfRef.current as { destroy?: () => void } | null)?.destroy?.();
+          pdfRef.current = null;
+          bytesKeyRef.current = pdfBytes;
+          restoredForSizeRef.current = '';
+        }
         if (!pdfRef.current) {
           const loadingTask = pdfjsLib.getDocument({ data: pdfBytes.slice(0) });
           pdfRef.current = await loadingTask.promise;
@@ -87,7 +95,9 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
         if (!cancelled) {
           // Retry once with a very conservative render (small canvas, no DPR).
           try {
-            const pdf = pdfRef.current!;
+            const pdf = pdfRef.current
+              ?? (await pdfjsLib.getDocument({ data: pdfBytes.slice(0) }).promise);
+            pdfRef.current = pdf;
             const idx = Math.min(Math.max(pageIndex, 0), pdf.numPages - 1);
             const page = await pdf.getPage(idx + 1);
             const base = page.getViewport({ scale: 1 });
@@ -115,15 +125,10 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
     return () => { cancelled = true; };
   }, [pdfBytes, pageIndex]);
 
-  useEffect(() => {
+  useEffect(() => () => {
     (pdfRef.current as { destroy?: () => void } | null)?.destroy?.();
     pdfRef.current = null;
-    restoredForSizeRef.current = '';
-    return () => {
-      (pdfRef.current as { destroy?: () => void } | null)?.destroy?.();
-      pdfRef.current = null;
-    };
-  }, [pdfBytes]);
+  }, []);
 
   // Restore persisted ratio placement whenever the page (re)renders at a
   // new display size. Uses ratios so it lands at the same visual spot
