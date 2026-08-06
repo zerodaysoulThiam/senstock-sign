@@ -55,15 +55,24 @@ export async function saveDocument(doc: Omit<SignedDocument, "id">, pdfBlob?: Bl
   const user = getCurrentUser();
   if (!user) throw new Error("Non authentifié");
   let storagePath: string | null = null;
+  let uploadError: string | null = null;
   if (pdfBlob) {
     const safeName = doc.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-    storagePath = `${user.id}/${Date.now()}_${safeName}`;
-    const { error: upErr } = await supabase.storage
-      .from("signed-documents")
-      .upload(storagePath, pdfBlob, { contentType: "application/pdf", upsert: false });
-    if (upErr) {
-      console.error("upload failed", upErr);
-      storagePath = null;
+    const path = `${user.id}/${Date.now()}_${safeName}`;
+    // Gros PDF (plusieurs centaines de pages) : on tente plusieurs fois,
+    // l'upload peut échouer sur une connexion instable.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { error: upErr } = await supabase.storage
+        .from("signed-documents")
+        .upload(path, pdfBlob, { contentType: "application/pdf", upsert: true });
+      if (!upErr) {
+        storagePath = path;
+        uploadError = null;
+        break;
+      }
+      console.error(`upload attempt ${attempt + 1} failed`, upErr);
+      uploadError = upErr.message;
+      await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
     }
   }
   const { data, error } = await supabase
@@ -80,23 +89,36 @@ export async function saveDocument(doc: Omit<SignedDocument, "id">, pdfBlob?: Bl
     .select()
     .single();
   if (error) throw error;
+  if (uploadError) {
+    const sizeMb = pdfBlob ? (pdfBlob.size / (1024 * 1024)).toFixed(1) : "?";
+    throw Object.assign(
+      new Error(
+        `Document signé et enregistré, mais l'envoi du fichier (${sizeMb} Mo) au cloud a échoué : ${uploadError}`
+      ),
+      { saved: { ...doc, id: data.id, storagePath: null } }
+    );
+  }
   return { ...doc, id: data.id, storagePath } as SignedDocument;
 }
 
 export async function downloadSignedDocument(doc: SignedDocument): Promise<void> {
-  if (!doc.storagePath) throw new Error("Aucun fichier disponible pour ce document");
+  if (!doc.storagePath)
+    throw new Error(
+      "Aucun fichier n'a été envoyé au cloud pour ce document (l'upload avait échoué). Re-signez le document pour pouvoir le télécharger."
+    );
   const { data, error } = await supabase.storage
     .from("signed-documents")
-    .createSignedUrl(doc.storagePath, 60);
+    .createSignedUrl(doc.storagePath, 300, { download: `signé_${doc.fileName}` });
   if (error || !data?.signedUrl) throw error ?? new Error("URL indisponible");
-  const res = await fetch(data.signedUrl);
-  const blob = await res.blob();
-  const url = URL.createObjectURL(blob);
+  // Téléchargement direct via l'URL signée : pas de mise en mémoire du blob,
+  // ce qui permet de récupérer les PDF très volumineux (500+ pages).
   const a = document.createElement("a");
-  a.href = url;
-  a.download = `signé_${doc.fileName}`;
+  a.href = data.signedUrl;
+  a.rel = "noopener";
+  a.target = "_blank";
+  document.body.appendChild(a);
   a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  a.remove();
 }
 
 export async function getStats() {

@@ -152,9 +152,9 @@ export default function SignDocument() {
           signaturePosition: position,
           pageCount,
         }, blob);
-      } catch (e) {
+      } catch (e: any) {
         console.error('saveDocument failed', e);
-        toast.error("Document signé mais non sauvegardé dans le cloud");
+        toast.error(e?.message || "Document signé mais non sauvegardé dans le cloud", { duration: 8000 });
       }
 
       const nowIso = new Date().toISOString();
