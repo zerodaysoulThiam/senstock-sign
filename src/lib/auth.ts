@@ -1,4 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
+import { validatePassword } from "@/lib/password";
 
 export interface User {
   id: string;
@@ -110,7 +111,7 @@ export async function addUser(
 ): Promise<"created" | "updated" | "invalid"> {
   const normalizedEmail = normalizeEmail(email);
   const normalizedPassword = password.trim();
-  if (!normalizedEmail || normalizedPassword.length < 6) return "invalid";
+  if (!normalizedEmail || !validatePassword(normalizedPassword).valid) return "invalid";
   const { data, error } = await supabase.functions.invoke("admin-users", {
     body: { action: "create", email: normalizedEmail, password: normalizedPassword, role },
   });
@@ -127,11 +128,40 @@ export async function toggleUserActive(userId: string) {
 /** Admin: définit un nouveau mot de passe pour un utilisateur. */
 export async function setUserPassword(userId: string, password: string): Promise<boolean> {
   const pwd = password.trim();
-  if (pwd.length < 6) return false;
+  if (!validatePassword(pwd).valid) return false;
   const { data, error } = await supabase.functions.invoke("admin-users", {
     body: { action: "set-password", userId, password: pwd },
   });
   return !error && !!data?.ok;
+}
+
+/** L'utilisateur connecté change son propre mot de passe. */
+export async function changeOwnPassword(
+  currentPassword: string,
+  newPassword: string
+): Promise<{ ok: boolean; error?: string }> {
+  const next = newPassword.trim();
+  const check = validatePassword(next);
+  if (!check.valid) return { ok: false, error: check.errors.join(" · ") };
+
+  const { data: { session } } = await supabase.auth.getSession();
+  const email = session?.user?.email;
+  if (!email) return { ok: false, error: "Session expirée, reconnectez-vous." };
+
+  // Ré-authentification avec le mot de passe actuel
+  const { error: reauthError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword.trim(),
+  });
+  if (reauthError) return { ok: false, error: "Mot de passe actuel incorrect." };
+
+  if (currentPassword.trim() === next) {
+    return { ok: false, error: "Le nouveau mot de passe doit être différent de l'actuel." };
+  }
+
+  const { error } = await supabase.auth.updateUser({ password: next });
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
 }
 
 /** Admin: supprime définitivement un utilisateur et ses documents. */

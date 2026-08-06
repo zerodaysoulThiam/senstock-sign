@@ -20,6 +20,30 @@ const DEFAULT_USERS = [
   { email: "admin@senstock.sn", password: "admin123", role: "admin" as const },
 ];
 
+const PASSWORD_MIN_LENGTH = 10;
+
+/** Politique de mot de passe (miroir de src/lib/password.ts). */
+function passwordPolicyErrors(raw: string): string[] {
+  const pwd = (raw ?? "").trim();
+  const errors: string[] = [];
+  if (pwd.length < PASSWORD_MIN_LENGTH) errors.push(`au moins ${PASSWORD_MIN_LENGTH} caractères`);
+  if (!/[A-Z]/.test(pwd)) errors.push("une lettre majuscule");
+  if (!/[a-z]/.test(pwd)) errors.push("une lettre minuscule");
+  if (!/[0-9]/.test(pwd)) errors.push("un chiffre");
+  if (!/[^A-Za-z0-9]/.test(pwd)) errors.push("un caractère spécial");
+  if (/^(.)\1+$/.test(pwd)) errors.push("pas un caractère répété");
+  const weak = ["password", "passer123", "motdepasse", "azerty", "qwerty", "123456", "admin123", "senstock"];
+  if (weak.some((w) => pwd.toLowerCase().includes(w))) errors.push("mot de passe trop courant");
+  return errors;
+}
+
+function policyResponse(errors: string[], cors: Record<string, string>) {
+  return new Response(
+    JSON.stringify({ error: `Mot de passe non conforme : ${errors.join(", ")}.` }),
+    { status: 400, headers: { ...cors, "Content-Type": "application/json" } }
+  );
+}
+
 function extractName(email: string) {
   return email
     .split("@")[0]
@@ -168,12 +192,14 @@ Deno.serve(async (req) => {
       const email = String(body.email ?? "").trim().toLowerCase();
       const password = String(body.password ?? "").trim();
       const role = (body.role === "admin" ? "admin" : "user") as "admin" | "user";
-      if (!email || password.length < 6) {
+      if (!email) {
         return new Response(
-          JSON.stringify({ error: "Email invalide ou mot de passe trop court (min 6)." }),
+          JSON.stringify({ error: "Email invalide." }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      const createErrors = passwordPolicyErrors(password);
+      if (createErrors.length > 0) return policyResponse(createErrors, corsHeaders);
       const result = await createAuthUser(email, password, role);
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -207,12 +233,14 @@ Deno.serve(async (req) => {
     if (action === "set-password") {
       const userId = String(body.userId ?? "");
       const password = String(body.password ?? "").trim();
-      if (!userId || password.length < 6) {
+      if (!userId) {
         return new Response(
-          JSON.stringify({ error: "Mot de passe trop court (min 6 caractères)." }),
+          JSON.stringify({ error: "userId requis" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+      const pwdErrors = passwordPolicyErrors(password);
+      if (pwdErrors.length > 0) return policyResponse(pwdErrors, corsHeaders);
       const { error } = await admin.auth.admin.updateUserById(userId, { password });
       if (error) throw error;
       return new Response(JSON.stringify({ ok: true }), {
