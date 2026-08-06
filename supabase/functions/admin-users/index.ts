@@ -104,23 +104,6 @@ async function deleteUserCascade(userId: string) {
   if (error) throw error;
 }
 
-async function unusedIsCallerAdmin(authHeader: string | null): Promise<{ ok: boolean; userId?: string }> {
-  if (!authHeader) return { ok: false };
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  const client = createClient(SUPABASE_URL, ANON_KEY, {
-    global: { headers: { Authorization: `Bearer ${token}` } },
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data, error } = await client.auth.getUser();
-  if (error || !data.user) return { ok: false };
-  const { data: roles } = await admin
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", data.user.id);
-  const isAdmin = !!roles?.some((r) => r.role === "admin");
-  return { ok: isAdmin, userId: data.user.id };
-}
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
 
