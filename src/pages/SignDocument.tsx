@@ -141,12 +141,10 @@ export default function SignDocument() {
     const type = file.type.includes('png') ? 'png' : 'jpg';
     setStampType(type);
     autoAppliedRef.current = true;
-    if (!hasDefaultSignature) {
-      const ok = await saveDefaultSignature(file, type);
-      if (ok) {
-        setHasDefaultSignature(true);
-        toast.success('Cachet enregistré comme signature par défaut de votre compte');
-      }
+    const ok = await saveDefaultSignature(file, type);
+    if (ok) {
+      setHasDefaultSignature(true);
+      toast.success('Cachet enregistré comme signature par défaut de votre compte');
     }
     setStep('position');
   };
@@ -315,15 +313,25 @@ export default function SignDocument() {
                   <input ref={stampInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
                   {stampPreview ? (
                     <div className="text-center space-y-4">
-                      <p className="text-sm font-medium">Aperçu du cachet</p>
+                      <p className="text-sm font-medium">
+                        {hasDefaultSignature ? 'Votre signature enregistrée' : 'Aperçu du cachet'}
+                      </p>
                       <img src={stampPreview} alt="Cachet" className="max-h-40 mx-auto border rounded-lg p-2" />
-                      <Button variant="outline" onClick={() => stampInputRef.current?.click()}>Changer</Button>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <Button variant="outline" onClick={() => stampInputRef.current?.click()}>Changer</Button>
+                        {hasDefaultSignature && (
+                          <Button variant="ghost" onClick={handleForgetDefaultSignature}>Supprimer</Button>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <>
                       <Image className="h-16 w-16 text-muted-foreground/30 mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Téléchargez votre cachet</h3>
-                      <p className="text-sm text-muted-foreground text-center mb-4">Image PNG ou JPG de votre cachet professionnel</p>
+                      <p className="text-sm text-muted-foreground text-center mb-4">
+                        Image PNG ou JPG de votre cachet professionnel. Elle sera enregistrée une seule fois sur votre compte
+                        et appliquée automatiquement à chaque signature.
+                      </p>
                       <Button variant="outline" onClick={() => stampInputRef.current?.click()} className="gap-2">
                         <Upload className="h-4 w-4" />
                         Choisir une image
