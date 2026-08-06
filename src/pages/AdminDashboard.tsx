@@ -14,6 +14,8 @@ import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import PasswordPolicyField from '@/components/PasswordPolicyField';
+import { validatePassword } from '@/lib/password';
 
 type Tab = 'documents' | 'users' | 'stats';
 
@@ -59,6 +61,10 @@ export default function AdminDashboard() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !newPassword) return;
+    if (!validatePassword(newPassword).valid) {
+      toast.error('Mot de passe non conforme à la politique de sécurité');
+      return;
+    }
     const result = await addUser(newEmail, newPassword, newRole);
     if (result === 'created' || result === 'updated') {
       toast.success(result === 'created' ? 'Utilisateur ajouté' : 'Utilisateur mis à jour');
@@ -67,7 +73,7 @@ export default function AdminDashboard() {
       setNewRole('user');
       await reload();
     } else {
-      toast.error('Email invalide ou mot de passe trop court (min 6)');
+      toast.error('Email invalide ou mot de passe non conforme');
     }
   };
 
@@ -79,6 +85,10 @@ export default function AdminDashboard() {
   const handleSetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pwdTarget) return;
+    if (!validatePassword(pwdValue).valid) {
+      toast.error('Mot de passe non conforme à la politique de sécurité');
+      return;
+    }
     setBusy(true);
     const ok = await setUserPassword(pwdTarget.id, pwdValue);
     setBusy(false);
@@ -87,7 +97,7 @@ export default function AdminDashboard() {
       setPwdTarget(null);
       setPwdValue('');
     } else {
-      toast.error('Mot de passe trop court (min 6 caractères) ou erreur');
+      toast.error('Mot de passe non conforme ou erreur');
     }
   };
 
@@ -219,7 +229,7 @@ export default function AdminDashboard() {
                   Supprimer tous les comptes sauf admin
                 </Button>
               </div>
-              <form onSubmit={handleAddUser} className="grid gap-3 sm:grid-cols-[1.5fr_1fr_1fr_auto] sm:items-end">
+              <form onSubmit={handleAddUser} className="grid gap-3 sm:grid-cols-[1.5fr_1fr_1.2fr_auto] sm:items-start">
                 <div>
                   <Label htmlFor="newemail" className="text-xs text-muted-foreground">Email professionnel</Label>
                   <Input id="newemail" type="email" placeholder="prenom.nom@senstock.sn" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
@@ -234,11 +244,14 @@ export default function AdminDashboard() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label htmlFor="newpwd" className="text-xs text-muted-foreground">Mot de passe initial</Label>
-                  <Input id="newpwd" type="password" placeholder="min. 6 caractères" minLength={6} value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
-                </div>
-                <Button type="submit" className="gap-2">
+                <PasswordPolicyField
+                  id="newpwd"
+                  label="Mot de passe initial"
+                  value={newPassword}
+                  onChange={setNewPassword}
+                  autoComplete="new-password"
+                />
+                <Button type="submit" className="gap-2" disabled={!validatePassword(newPassword).valid}>
                   <UserPlus className="h-4 w-4" />
                   Ajouter
                 </Button>
@@ -391,13 +404,15 @@ export default function AdminDashboard() {
           </DialogHeader>
           <form onSubmit={handleSetPassword} className="space-y-4">
             <p className="text-sm text-muted-foreground">{pwdTarget?.email}</p>
-            <div className="space-y-2">
-              <Label htmlFor="setpwd">Nouveau mot de passe</Label>
-              <Input id="setpwd" type="text" minLength={6} required value={pwdValue}
-                onChange={(e) => setPwdValue(e.target.value)} placeholder="min. 6 caractères" />
-            </div>
+            <PasswordPolicyField
+              id="setpwd"
+              label="Nouveau mot de passe"
+              value={pwdValue}
+              onChange={setPwdValue}
+              autoComplete="new-password"
+            />
             <DialogFooter>
-              <Button type="submit" disabled={busy} className="gap-2">
+              <Button type="submit" disabled={busy || !validatePassword(pwdValue).valid} className="gap-2">
                 <KeyRound className="h-4 w-4" />
                 Enregistrer
               </Button>
