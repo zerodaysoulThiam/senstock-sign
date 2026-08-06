@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { login } from '@/lib/auth';
+import { checkLoginAllowed, recordLoginAttempt, localStatus, formatCountdown, MAX_FAILURES, LOCKOUT_MINUTES } from '@/lib/login-guard';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Mail, Lock, AlertCircle } from 'lucide-react'; // PenTool retiré
+import { Mail, Lock, AlertCircle, ShieldAlert } from 'lucide-react'; // PenTool retiré
 import { motion } from 'framer-motion';
 import loginBg from '@/assets/login-bg.jpg';
 import senstockLogo from '@/assets/senstock-logo.jpg'; // Import du logo
@@ -14,16 +15,51 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [lockSeconds, setLockSeconds] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const navigate = useNavigate();
+
+  // Compte à rebours du blocage temporaire
+  useEffect(() => {
+    if (lockSeconds <= 0) return;
+    const t = setInterval(() => setLockSeconds(s => (s <= 1 ? 0 : s - 1)), 1000);
+    return () => clearInterval(t);
+  }, [lockSeconds]);
+
+  // Restaure un éventuel blocage en cours quand l'email change
+  useEffect(() => {
+    if (!email.includes('@')) return;
+    const st = localStatus(email);
+    setLockSeconds(st.blocked ? st.retryAfterSeconds : 0);
+  }, [email]);
+
+  const locked = lockSeconds > 0;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (locked) return;
     setLoading(true);
+
+    const gate = await checkLoginAllowed(email);
+    if (gate.blocked) {
+      setLockSeconds(gate.retryAfterSeconds || LOCKOUT_MINUTES * 60);
+      setError(`Trop de tentatives échouées. Compte temporairement bloqué.`);
+      setLoading(false);
+      return;
+    }
+
     const user = await login(email, password);
+    const status = await recordLoginAttempt(email, !!user);
+
     if (user) {
+      setRemaining(null);
       navigate('/dashboard');
+    } else if (status.blocked) {
+      setLockSeconds(status.retryAfterSeconds || LOCKOUT_MINUTES * 60);
+      setError('Trop de tentatives échouées. Compte temporairement bloqué.');
     } else {
+      setRemaining(status.remaining);
       setError('Email ou mot de passe incorrect');
     }
     setLoading(false);
@@ -89,23 +125,45 @@ export default function Login() {
                   onChange={e => setPassword(e.target.value)}
                   className="pl-10"
                   required
+                  disabled={locked}
                 />
               </div>
             </div>
 
-            {error && (
+            {locked ? (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3"
+                className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3"
               >
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                {error}
+                <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  Connexion bloquée après {MAX_FAILURES} tentatives échouées.
+                  <br />
+                  Nouvelle tentative possible dans <strong>{formatCountdown(lockSeconds)}</strong>.
+                </span>
+              </motion.div>
+            ) : error && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex items-start gap-2 text-sm text-destructive bg-destructive/10 rounded-lg p-3"
+              >
+                <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                <span>
+                  {error}
+                  {remaining !== null && remaining > 0 && (
+                    <>
+                      <br />
+                      {remaining} tentative{remaining > 1 ? 's' : ''} restante{remaining > 1 ? 's' : ''} avant blocage de {LOCKOUT_MINUTES} minutes.
+                    </>
+                  )}
+                </span>
               </motion.div>
             )}
 
-            <Button type="submit" className="w-full h-11" disabled={loading}>
-              {loading ? 'Connexion...' : 'Se connecter'}
+            <Button type="submit" className="w-full h-11" disabled={loading || locked}>
+              {locked ? `Réessayez dans ${formatCountdown(lockSeconds)}` : loading ? 'Connexion...' : 'Se connecter'}
             </Button>
           </form>
 
