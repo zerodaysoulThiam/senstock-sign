@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Tab = 'documents' | 'users' | 'stats';
 
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
 
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newRole, setNewRole] = useState<'user' | 'admin'>('user');
   const [receiptDoc, setReceiptDoc] = useState<SignedDocument | null>(null);
   const [pwdTarget, setPwdTarget] = useState<User | null>(null);
   const [pwdValue, setPwdValue] = useState('');
@@ -57,11 +59,12 @@ export default function AdminDashboard() {
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmail || !newPassword) return;
-    const result = await addUser(newEmail, newPassword);
+    const result = await addUser(newEmail, newPassword, newRole);
     if (result === 'created' || result === 'updated') {
       toast.success(result === 'created' ? 'Utilisateur ajouté' : 'Utilisateur mis à jour');
       setNewEmail('');
       setNewPassword('');
+      setNewRole('user');
       await reload();
     } else {
       toast.error('Email invalide ou mot de passe trop court (min 6)');
@@ -216,14 +219,24 @@ export default function AdminDashboard() {
                   Supprimer tous les comptes sauf admin
                 </Button>
               </div>
-              <form onSubmit={handleAddUser} className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1">
-                  <Label htmlFor="newemail" className="sr-only">Email</Label>
+              <form onSubmit={handleAddUser} className="grid gap-3 sm:grid-cols-[1.5fr_1fr_1fr_auto] sm:items-end">
+                <div>
+                  <Label htmlFor="newemail" className="text-xs text-muted-foreground">Email professionnel</Label>
                   <Input id="newemail" type="email" placeholder="prenom.nom@senstock.sn" value={newEmail} onChange={e => setNewEmail(e.target.value)} required />
                 </div>
-                <div className="flex-1">
-                  <Label htmlFor="newpwd" className="sr-only">Mot de passe</Label>
-                  <Input id="newpwd" type="password" placeholder="Mot de passe" value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
+                <div>
+                  <Label htmlFor="newrole" className="text-xs text-muted-foreground">Rôle</Label>
+                  <Select value={newRole} onValueChange={(v) => setNewRole(v as 'user' | 'admin')}>
+                    <SelectTrigger id="newrole"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">Utilisateur</SelectItem>
+                      <SelectItem value="admin">Administrateur</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="newpwd" className="text-xs text-muted-foreground">Mot de passe initial</Label>
+                  <Input id="newpwd" type="password" placeholder="min. 6 caractères" minLength={6} value={newPassword} onChange={e => setNewPassword(e.target.value)} required />
                 </div>
                 <Button type="submit" className="gap-2">
                   <UserPlus className="h-4 w-4" />
