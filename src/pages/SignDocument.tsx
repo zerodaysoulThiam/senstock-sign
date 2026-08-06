@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import SignatureReceipt, { detectDevice, makeSessionFingerprint, makeSignatureId, type SignatureReceiptData } from '@/components/SignatureReceipt';
 import EmailShareMenu from '@/components/EmailShareMenu';
+import { loadDefaultSignature, saveDefaultSignature, deleteDefaultSignature } from '@/lib/signature';
 
 type Step = 'upload' | 'stamp' | 'position' | 'done';
 
@@ -29,7 +30,7 @@ export default function SignDocument() {
   const [stampBytes, setStampBytes] = useState<Uint8Array | null>(null);
   const [stampType, setStampType] = useState<'png' | 'jpg'>('png');
 
-  const [position, setPosition] = useState<SignaturePosition>('last');
+  const [position, setPosition] = useState<SignaturePosition>('all');
   const [placement, setPlacement] = useState<PlacementResult | null>(null);
   const placementRef = useRef<PlacementResult | null>(null);
   const [previewPageIndex, setPreviewPageIndex] = useState(0);
@@ -39,6 +40,9 @@ export default function SignDocument() {
   const [signedPdfUrl, setSignedPdfUrl] = useState<string>('');
   const [signedFileName, setSignedFileName] = useState('');
   const [receipt, setReceipt] = useState<SignatureReceiptData | null>(null);
+  const [hasDefaultSignature, setHasDefaultSignature] = useState(false);
+  const [loadingDefaultSignature, setLoadingDefaultSignature] = useState(true);
+  const autoAppliedRef = useRef(false);
 
   const pdfInputRef = useRef<HTMLInputElement>(null);
   const stampInputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +50,34 @@ export default function SignDocument() {
   useEffect(() => {
     if (!user) navigate('/login');
   }, []);
+
+  // Signature enregistrée : chargée une fois puis appliquée automatiquement.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const sig = await loadDefaultSignature();
+      if (cancelled) return;
+      if (sig) {
+        setHasDefaultSignature(true);
+        setStampBytes(sig.bytes);
+        setStampType(sig.type);
+        setStampPreview(sig.url);
+      }
+      setLoadingDefaultSignature(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Dès que le PDF est chargé, si une signature par défaut existe on passe
+  // directement au positionnement.
+  useEffect(() => {
+    if (step !== 'stamp' || loadingDefaultSignature || autoAppliedRef.current) return;
+    if (hasDefaultSignature && stampBytes) {
+      autoAppliedRef.current = true;
+      setStep('position');
+      toast.success('Votre signature enregistrée a été appliquée automatiquement');
+    }
+  }, [step, loadingDefaultSignature, hasDefaultSignature, stampBytes]);
 
   if (!user) return null;
 
@@ -106,8 +138,26 @@ export default function SignDocument() {
     setStampPreview(URL.createObjectURL(file));
     const bytes = new Uint8Array(await file.arrayBuffer());
     setStampBytes(bytes);
-    setStampType(file.type.includes('png') ? 'png' : 'jpg');
+    const type = file.type.includes('png') ? 'png' : 'jpg';
+    setStampType(type);
+    autoAppliedRef.current = true;
+    const ok = await saveDefaultSignature(file, type);
+    if (ok) {
+      setHasDefaultSignature(true);
+      toast.success('Cachet enregistré comme signature par défaut de votre compte');
+    }
     setStep('position');
+  };
+
+  const handleForgetDefaultSignature = async () => {
+    await deleteDefaultSignature();
+    setHasDefaultSignature(false);
+    setStampBytes(null);
+    setStampPreview('');
+    setStampFile(null);
+    autoAppliedRef.current = true;
+    setStep('stamp');
+    toast.success('Signature enregistrée supprimée');
   };
 
   const handleSign = async () => {
@@ -263,15 +313,25 @@ export default function SignDocument() {
                   <input ref={stampInputRef} type="file" accept="image/png,image/jpeg,image/jpg" onChange={handleStampUpload} className="hidden" />
                   {stampPreview ? (
                     <div className="text-center space-y-4">
-                      <p className="text-sm font-medium">Aperçu du cachet</p>
+                      <p className="text-sm font-medium">
+                        {hasDefaultSignature ? 'Votre signature enregistrée' : 'Aperçu du cachet'}
+                      </p>
                       <img src={stampPreview} alt="Cachet" className="max-h-40 mx-auto border rounded-lg p-2" />
-                      <Button variant="outline" onClick={() => stampInputRef.current?.click()}>Changer</Button>
+                      <div className="flex flex-wrap justify-center gap-2">
+                        <Button variant="outline" onClick={() => stampInputRef.current?.click()}>Changer</Button>
+                        {hasDefaultSignature && (
+                          <Button variant="ghost" onClick={handleForgetDefaultSignature}>Supprimer</Button>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <>
                       <Image className="h-16 w-16 text-muted-foreground/30 mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Téléchargez votre cachet</h3>
-                      <p className="text-sm text-muted-foreground text-center mb-4">Image PNG ou JPG de votre cachet professionnel</p>
+                      <p className="text-sm text-muted-foreground text-center mb-4">
+                        Image PNG ou JPG de votre cachet professionnel. Elle sera enregistrée une seule fois sur votre compte
+                        et appliquée automatiquement à chaque signature.
+                      </p>
                       <Button variant="outline" onClick={() => stampInputRef.current?.click()} className="gap-2">
                         <Upload className="h-4 w-4" />
                         Choisir une image

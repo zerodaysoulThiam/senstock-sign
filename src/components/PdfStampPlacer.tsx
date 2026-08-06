@@ -34,6 +34,7 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
   const [imgAspect, setImgAspect] = useState(2); // w/h
   const dragRef = useRef<{ dx: number; dy: number; mode: 'move' | 'resize' } | null>(null);
   const restoredForSizeRef = useRef<string>('');
+  const defaultPlacedRef = useRef(false);
   const pdfRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
 
   // Render the PDF page
@@ -140,6 +141,19 @@ export default function PdfStampPlacer({ pdfBytes, pageIndex, stampSrc, onChange
       const yFromBottomCss = (1 - initialRatio.yRatio) * displaySize.h - h;
       const y = Math.max(0, Math.min(yFromBottomCss, displaySize.h - h));
       setStamp({ x, y, w, h });
+      defaultPlacedRef.current = true;
+    } else if (!defaultPlacedRef.current) {
+      // Placement par défaut : coin bas-droite avec une petite marge.
+      const margin = Math.max(12, displaySize.w * 0.04);
+      const w = Math.max(60, Math.min(displaySize.w * 0.28, displaySize.w - margin * 2));
+      const h = w / imgAspect;
+      setStamp({
+        x: Math.max(0, displaySize.w - w - margin),
+        y: Math.max(0, displaySize.h - h - margin),
+        w,
+        h,
+      });
+      defaultPlacedRef.current = true;
     }
   }, [displaySize, pageIndex, initialRatio, imgAspect]);
 
