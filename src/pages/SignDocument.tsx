@@ -328,6 +328,7 @@ export default function SignDocument() {
                         {hasDefaultSignature && (
                           <Button variant="ghost" onClick={handleForgetDefaultSignature}>Supprimer</Button>
                         )}
+                        <Button variant="ghost" onClick={() => navigate('/ma-signature')}>Gérer mon cachet</Button>
                       </div>
                     </div>
                   ) : (
@@ -341,6 +342,9 @@ export default function SignDocument() {
                       <Button variant="outline" onClick={() => stampInputRef.current?.click()} className="gap-2">
                         <Upload className="h-4 w-4" />
                         Choisir une image
+                      </Button>
+                      <Button variant="ghost" onClick={() => navigate('/ma-signature')} className="mt-2">
+                        Gérer mon cachet
                       </Button>
                     </>
                   )}
