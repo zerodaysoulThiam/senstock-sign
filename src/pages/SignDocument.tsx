@@ -328,6 +328,7 @@ export default function SignDocument() {
                         {hasDefaultSignature && (
                           <Button variant="ghost" onClick={handleForgetDefaultSignature}>Supprimer</Button>
                         )}
+                        <Button variant="ghost" onClick={() => navigate('/ma-signature')}>Gérer mon cachet</Button>
                       </div>
                     </div>
                   ) : (
@@ -341,6 +342,9 @@ export default function SignDocument() {
                       <Button variant="outline" onClick={() => stampInputRef.current?.click()} className="gap-2">
                         <Upload className="h-4 w-4" />
                         Choisir une image
+                      </Button>
+                      <Button variant="ghost" onClick={() => navigate('/ma-signature')} className="mt-2">
+                        Gérer mon cachet
                       </Button>
                     </>
                   )}
@@ -383,20 +387,13 @@ export default function SignDocument() {
                   <div className="mt-6 space-y-3">
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <Label className="text-sm font-medium">Placement libre du cachet</Label>
-                      {pageCount > 1 && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="text-muted-foreground">Page d'aperçu :</span>
-                          <Button size="sm" variant="outline" disabled={previewPageIndex <= 0}
-                            onClick={() => setPreviewPageIndex(i => Math.max(0, i - 1))}>‹</Button>
-                          <span className="font-medium">{previewPageIndex + 1} / {pageCount}</span>
-                          <Button size="sm" variant="outline" disabled={previewPageIndex >= pageCount - 1}
-                            onClick={() => setPreviewPageIndex(i => Math.min(pageCount - 1, i + 1))}>›</Button>
-                        </div>
-                      )}
+                      <span className="text-xs text-muted-foreground">
+                        Faites défiler le document avec les flèches ↑ ↓
+                      </span>
                     </div>
                     <PdfStampPlacer
                       pdfBytes={pdfBytes}
-                      pageIndex={previewPageIndex}
+                      initialPageIndex={previewPageIndex}
                       stampSrc={stampPreview}
                       onChange={(nextPlacement) => {
                         placementRef.current = nextPlacement;
