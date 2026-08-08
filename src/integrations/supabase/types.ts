@@ -17,13 +17,20 @@ export type Database = {
       documents: {
         Row: {
           audit_trail: Json | null
+          auth_method: string | null
+          cert_serial: string | null
+          cert_subject: string | null
           created_at: string
+          crypto_signed: boolean
           id: string
           name: string
           owner_id: string
           pdf_data: string | null
           placement: Json | null
+          sha256: string | null
+          signature_id: string | null
           signed_at: string | null
+          signer_ip: string | null
           stamp_data: string | null
           status: string
           storage_path: string | null
@@ -31,13 +38,20 @@ export type Database = {
         }
         Insert: {
           audit_trail?: Json | null
+          auth_method?: string | null
+          cert_serial?: string | null
+          cert_subject?: string | null
           created_at?: string
+          crypto_signed?: boolean
           id?: string
           name: string
           owner_id: string
           pdf_data?: string | null
           placement?: Json | null
+          sha256?: string | null
+          signature_id?: string | null
           signed_at?: string | null
+          signer_ip?: string | null
           stamp_data?: string | null
           status?: string
           storage_path?: string | null
@@ -45,13 +59,20 @@ export type Database = {
         }
         Update: {
           audit_trail?: Json | null
+          auth_method?: string | null
+          cert_serial?: string | null
+          cert_subject?: string | null
           created_at?: string
+          crypto_signed?: boolean
           id?: string
           name?: string
           owner_id?: string
           pdf_data?: string | null
           placement?: Json | null
+          sha256?: string | null
+          signature_id?: string | null
           signed_at?: string | null
+          signer_ip?: string | null
           stamp_data?: string | null
           status?: string
           storage_path?: string | null

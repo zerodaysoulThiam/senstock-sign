@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getCurrentUser, extractName, logout } from '@/lib/auth';
-import { LogOut, FileText, Shield, PenTool, KeyRound, Stamp } from 'lucide-react';
+import { LogOut, FileText, Shield, PenTool, KeyRound, Stamp, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ChangePasswordDialog from '@/components/ChangePasswordDialog';
 import senstockLogo from '@/assets/senstock-logo.jpg'; // Import du logo
@@ -26,6 +26,7 @@ export default function AppHeader() {
     { path: '/dashboard', label: 'Tableau de bord', icon: FileText },
     { path: '/sign', label: 'Signer', icon: PenTool },
     { path: '/ma-signature', label: 'Mon cachet', icon: Stamp },
+    { path: '/verifier', label: 'Vérifier', icon: ShieldCheck },
     ...(isAdmin ? [{ path: '/admin', label: 'Administration', icon: Shield }] : []),
   ];
 

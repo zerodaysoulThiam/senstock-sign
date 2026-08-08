@@ -9,6 +9,7 @@ import Dashboard from "./pages/Dashboard";
 import SignDocument from "./pages/SignDocument";
 import MySignature from "./pages/MySignature";
 import AdminDashboard from "./pages/AdminDashboard";
+import VerifyDocument from "./pages/VerifyDocument";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +27,7 @@ const App = () => (
           <Route path="/sign" element={<SignDocument />} />
           <Route path="/ma-signature" element={<MySignature />} />
           <Route path="/admin" element={<AdminDashboard />} />
+          <Route path="/verifier" element={<VerifyDocument />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

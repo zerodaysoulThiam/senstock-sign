@@ -170,6 +170,11 @@ export default function Login() {
           <p className="text-xs text-center text-muted-foreground mt-6">
             Accès réservé aux employés SENSTOCK
           </p>
+          <p className="text-xs text-center mt-2">
+            <a href="/verifier" className="text-primary underline">
+              Vérifier l'authenticité d'un document signé
+            </a>
+          </p>
         </div>
       </motion.div>
     </div>

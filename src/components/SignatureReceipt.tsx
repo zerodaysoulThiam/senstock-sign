@@ -11,6 +11,9 @@ export interface SignatureReceiptData {
   method?: string;
   fileName: string;
   pagesSigned: string; // e.g. "Dernière", "Toutes", ...
+  sha256?: string | null;
+  cryptoSigned?: boolean;
+  certSubject?: string | null;
 }
 
 function fmtDate(iso: string) {
@@ -69,18 +72,23 @@ export function pagesLabelFor(position: string): string {
 export function receiptFromDoc(doc: {
   id: string; fileName: string; signedBy: string; signedByName: string;
   signedAt: string; signaturePosition: string;
+  sha256?: string | null; signatureId?: string | null; authMethod?: string | null;
+  signerIp?: string | null; cryptoSigned?: boolean; certSubject?: string | null;
 }): SignatureReceiptData {
   const seed = `${doc.signedBy}|${doc.fileName}|${doc.signedAt}|${doc.id}`;
   return {
-    signatureId: makeSignatureId(seed),
+    signatureId: doc.signatureId ?? makeSignatureId(seed),
     signerName: doc.signedByName,
     signerEmail: doc.signedBy,
     signedAt: doc.signedAt,
     device: detectDevice(),
-    ipOrSession: makeSessionFingerprint(seed),
-    method: 'Signature électronique avec cachet',
+    ipOrSession: doc.signerIp && doc.signerIp !== 'unknown' ? doc.signerIp : makeSessionFingerprint(seed),
+    method: doc.authMethod ?? 'Signature électronique avec cachet',
     fileName: doc.fileName,
     pagesSigned: pagesLabelFor(doc.signaturePosition),
+    sha256: doc.sha256 ?? null,
+    cryptoSigned: doc.cryptoSigned,
+    certSubject: doc.certSubject ?? null,
   };
 }
 
@@ -96,6 +104,15 @@ export default function SignatureReceipt({ data, onClose }: { data: SignatureRec
     { icon: ShieldCheck, label: 'Méthode', value: data.method || 'Signature électronique' },
     { icon: FileText, label: 'Document', value: data.fileName },
     { icon: CheckCircle2, label: 'Pages', value: data.pagesSigned },
+    ...(data.sha256 ? [{ icon: Fingerprint, label: 'SHA-256', value: data.sha256 }] : []),
+    ...(data.cryptoSigned !== undefined ? [{
+      icon: ShieldCheck,
+      label: 'Signature PDF',
+      value: data.cryptoSigned
+        ? 'Signature cryptographique PAdES intégrée'
+        : 'Cachet + empreinte SHA-256 (sans certificat)',
+    }] : []),
+    ...(data.certSubject ? [{ icon: ShieldCheck, label: 'Certificat', value: data.certSubject }] : []),
   ];
   return (
     <div className="bg-card rounded-xl border shadow-sm overflow-hidden text-left">
@@ -119,7 +136,7 @@ export default function SignatureReceipt({ data, onClose }: { data: SignatureRec
             <r.icon className="h-3.5 w-3.5 text-muted-foreground mt-0.5 shrink-0" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-0.5 sm:gap-3 flex-1 min-w-0">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wide">{r.label}</span>
-              <span className="sm:col-span-2 text-xs sm:text-sm font-medium break-words">{r.value}</span>
+              <span className={`sm:col-span-2 text-xs sm:text-sm font-medium break-all ${r.label === 'SHA-256' ? 'font-mono text-[10px] sm:text-[11px] leading-relaxed' : ''}`}>{r.value}</span>
             </div>
           </div>
         ))}

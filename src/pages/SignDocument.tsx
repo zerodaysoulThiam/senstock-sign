@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
-import { saveDocument } from '@/lib/documents';
+import { registerSignedDocument, getSignedUrl } from '@/lib/documents';
 import { signPDF, type SignaturePosition } from '@/lib/pdf-signer';
 import AppHeader from '@/components/AppHeader';
 import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import SignatureReceipt, { detectDevice, makeSessionFingerprint, makeSignatureId, type SignatureReceiptData } from '@/components/SignatureReceipt';
 import EmailShareMenu from '@/components/EmailShareMenu';
-import { loadDefaultSignature, saveDefaultSignature, deleteDefaultSignature } from '@/lib/signature';
+import { loadDefaultSignature, saveDefaultSignature, deleteDefaultSignature, normalizeToPngBytes } from '@/lib/signature';
 
 type Step = 'upload' | 'stamp' | 'position' | 'done';
 
@@ -136,9 +136,15 @@ export default function SignDocument() {
     }
     setStampFile(file);
     setStampPreview(URL.createObjectURL(file));
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes: Uint8Array;
+    let type: 'png' | 'jpg' = 'png';
+    try {
+      bytes = await normalizeToPngBytes(file);
+    } catch {
+      bytes = new Uint8Array(await file.arrayBuffer());
+      type = file.type.includes('png') ? 'png' : 'jpg';
+    }
     setStampBytes(bytes);
-    const type = file.type.includes('png') ? 'png' : 'jpg';
     setStampType(type);
     autoAppliedRef.current = true;
     const ok = await saveDefaultSignature(file, type);
@@ -193,33 +199,43 @@ export default function SignDocument() {
       const fileName = `signé_${pdfFile.name}`;
       setSignedFileName(fileName);
 
+      let proof: Awaited<ReturnType<typeof registerSignedDocument>> | null = null;
       try {
-        await saveDocument({
+        proof = await registerSignedDocument({
+          blob,
           fileName: pdfFile.name,
-          signedBy: user.email,
-          signedByName: signerName,
-          signedAt: new Date().toISOString(),
-          signaturePosition: position,
+          position,
           pageCount,
-        }, blob);
+          device: detectDevice(),
+        });
+        // Le PDF final (avec signature cryptographique) est celui du cloud.
+        if (proof.cryptoSigned) {
+          try {
+            const url = await getSignedUrl(proof.storagePath, fileName);
+            setSignedPdfUrl(url);
+          } catch (e) { console.error('signed url', e); }
+        }
       } catch (e: any) {
-        console.error('saveDocument failed', e);
-        toast.error(e?.message || "Document signé mais non sauvegardé dans le cloud", { duration: 8000 });
+        console.error('registerSignedDocument failed', e);
+        toast.error(e?.message || "Document signé mais dossier de preuve non enregistré", { duration: 8000 });
       }
 
-      const nowIso = new Date().toISOString();
+      const nowIso = proof?.signedAt ?? new Date().toISOString();
       const seed = `${user.email}|${pdfFile.name}|${nowIso}`;
       const pagesLabel = position === 'all' ? 'Toutes les pages' : position === 'first' ? 'Première' : position === 'last' ? 'Dernière' : 'Page du milieu';
       setReceipt({
-        signatureId: makeSignatureId(seed),
+        signatureId: proof?.signatureId ?? makeSignatureId(seed),
         signerName,
         signerEmail: user.email,
         signedAt: nowIso,
         device: detectDevice(),
-        ipOrSession: makeSessionFingerprint(seed),
-        method: 'Signature électronique avec cachet',
+        ipOrSession: proof?.ip && proof.ip !== 'unknown' ? proof.ip : makeSessionFingerprint(seed),
+        method: proof?.authMethod ?? 'Signature électronique avec cachet',
         fileName: pdfFile.name,
         pagesSigned: pagesLabel,
+        sha256: proof?.sha256 ?? null,
+        cryptoSigned: proof?.cryptoSigned,
+        certSubject: proof?.certSubject ?? null,
       });
 
       setStep('done');
