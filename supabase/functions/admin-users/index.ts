@@ -201,6 +201,10 @@ Deno.serve(async (req) => {
       const createErrors = passwordPolicyErrors(password);
       if (createErrors.length > 0) return policyResponse(createErrors, corsHeaders);
       const result = await createAuthUser(email, password, role);
+      // Première connexion : l'utilisateur devra définir lui-même son mot de passe.
+      if (result.id) {
+        await admin.from("profiles").update({ must_change_password: true }).eq("id", result.id);
+      }
       return new Response(JSON.stringify({ ok: true, ...result }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -243,6 +247,8 @@ Deno.serve(async (req) => {
       if (pwdErrors.length > 0) return policyResponse(pwdErrors, corsHeaders);
       const { error } = await admin.auth.admin.updateUserById(userId, { password });
       if (error) throw error;
+      // Mot de passe provisoire réinitialisé par un admin : changement obligatoire.
+      await admin.from("profiles").update({ must_change_password: true }).eq("id", userId);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });

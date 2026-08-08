@@ -7,6 +7,7 @@ export interface User {
   role: "admin" | "user";
   active: boolean;
   full_name?: string;
+  mustChangePassword?: boolean;
 }
 
 const CACHE_KEY = "senstock_current_user";
@@ -47,7 +48,7 @@ async function hydrateFromSession(): Promise<User | null> {
   }
   const uid = session.user.id;
   const [{ data: profile }, { data: roles }] = await Promise.all([
-    supabase.from("profiles").select("id, email, full_name, active").eq("id", uid).maybeSingle(),
+    supabase.from("profiles").select("id, email, full_name, active, must_change_password").eq("id", uid).maybeSingle(),
     supabase.from("user_roles").select("role").eq("user_id", uid),
   ]);
   const role = roles?.some((r) => r.role === "admin") ? "admin" : "user";
@@ -57,6 +58,7 @@ async function hydrateFromSession(): Promise<User | null> {
     full_name: profile?.full_name ?? undefined,
     role,
     active: profile?.active !== false,
+    mustChangePassword: (profile as any)?.must_change_password === true,
   };
   setCache(user);
   return user;
@@ -126,6 +128,27 @@ export async function toggleUserActive(userId: string) {
 }
 
 /** Admin: définit un nouveau mot de passe pour un utilisateur. */
+/** Première connexion : l'utilisateur définit lui-même son mot de passe. */
+export async function completeFirstLogin(newPassword: string): Promise<{ ok: boolean; error?: string }> {
+  const next = newPassword.trim();
+  const check = validatePassword(next);
+  if (!check.valid) return { ok: false, error: check.errors.join(" · ") };
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return { ok: false, error: "Session expirée, reconnectez-vous." };
+
+  const { error } = await supabase.auth.updateUser({ password: next });
+  if (error) return { ok: false, error: error.message };
+
+  await supabase
+    .from("profiles")
+    .update({ must_change_password: false } as any)
+    .eq("id", session.user.id);
+
+  await hydrateFromSession();
+  return { ok: true };
+}
+
 export async function setUserPassword(userId: string, password: string): Promise<boolean> {
   const pwd = password.trim();
   if (!validatePassword(pwd).valid) return false;
