@@ -5,7 +5,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { Buffer } from "node:buffer";
 import { PDFDocument } from "npm:pdf-lib@1.17.1";
 import { pdflibAddPlaceholder } from "npm:@signpdf/placeholder-pdf-lib@3.2.4";
-import signpdf from "npm:@signpdf/signpdf@3.2.4";
+import * as signpdfModule from "npm:@signpdf/signpdf@3.2.4";
 import { P12Signer } from "npm:@signpdf/signer-p12@3.2.4";
 
 const corsHeaders = {
@@ -67,7 +67,13 @@ async function cryptoSign(pdfBytes: Uint8Array, signerName: string, reason: stri
   });
   const withPlaceholder = Buffer.from(await pdfDoc.save({ useObjectStreams: false }));
   const signer = new P12Signer(p12, { passphrase: P12_PASSWORD });
-  const signed = await signpdf.sign(withPlaceholder, signer);
+  const mod: any = signpdfModule;
+  const engine = typeof mod?.sign === "function"
+    ? mod
+    : typeof mod?.default?.sign === "function"
+      ? mod.default
+      : new (mod.SignPdf ?? mod.default?.SignPdf)();
+  const signed = await engine.sign(withPlaceholder, signer);
   return new Uint8Array(signed);
 }
 
