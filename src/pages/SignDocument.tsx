@@ -12,7 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import SignatureReceipt, { detectDevice, makeSessionFingerprint, makeSignatureId, type SignatureReceiptData } from '@/components/SignatureReceipt';
 import EmailShareMenu from '@/components/EmailShareMenu';
-import { loadDefaultSignature, saveDefaultSignature, deleteDefaultSignature } from '@/lib/signature';
+import { loadDefaultSignature, saveDefaultSignature, deleteDefaultSignature, normalizeToPngBytes } from '@/lib/signature';
 
 type Step = 'upload' | 'stamp' | 'position' | 'done';
 
@@ -136,9 +136,15 @@ export default function SignDocument() {
     }
     setStampFile(file);
     setStampPreview(URL.createObjectURL(file));
-    const bytes = new Uint8Array(await file.arrayBuffer());
+    let bytes: Uint8Array;
+    let type: 'png' | 'jpg' = 'png';
+    try {
+      bytes = await normalizeToPngBytes(file);
+    } catch {
+      bytes = new Uint8Array(await file.arrayBuffer());
+      type = file.type.includes('png') ? 'png' : 'jpg';
+    }
     setStampBytes(bytes);
-    const type = file.type.includes('png') ? 'png' : 'jpg';
     setStampType(type);
     autoAppliedRef.current = true;
     const ok = await saveDefaultSignature(file, type);

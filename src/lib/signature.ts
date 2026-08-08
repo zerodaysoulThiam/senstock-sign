@@ -24,6 +24,26 @@ export async function saveDefaultSignature(file: Blob, type: "png" | "jpg"): Pro
   return !error;
 }
 
+/**
+ * Re-encode le cachet en PNG standard via le canvas.
+ * Certaines images (PNG 16 bits, entrelacés, profils exotiques) ne sont pas
+ * lisibles par pdf-lib : la normalisation garantit une signature toujours
+ * intégrable au PDF, en conservant la transparence.
+ */
+export async function normalizeToPngBytes(src: Blob): Promise<Uint8Array> {
+  const bitmap = await createImageBitmap(src);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Canvas indisponible");
+  ctx.drawImage(bitmap, 0, 0);
+  bitmap.close?.();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+  if (!blob) throw new Error("Conversion du cachet impossible");
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
 export interface DefaultSignature {
   bytes: Uint8Array;
   type: "png" | "jpg";
@@ -37,8 +57,13 @@ export async function loadDefaultSignature(): Promise<DefaultSignature | null> {
   for (const type of ["png", "jpg"] as const) {
     const { data, error } = await supabase.storage.from(BUCKET).download(pathFor(user.id, type));
     if (!error && data) {
-      const bytes = new Uint8Array(await data.arrayBuffer());
-      return { bytes, type, url: URL.createObjectURL(data) };
+      try {
+        const bytes = await normalizeToPngBytes(data);
+        return { bytes, type: "png", url: URL.createObjectURL(data) };
+      } catch (e) {
+        console.error("normalizeToPngBytes", e);
+        return { bytes: new Uint8Array(await data.arrayBuffer()), type, url: URL.createObjectURL(data) };
+      }
     }
   }
   return null;
