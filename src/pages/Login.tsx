@@ -54,7 +54,7 @@ export default function Login() {
 
     if (user) {
       setRemaining(null);
-      navigate('/dashboard');
+      navigate(user.mustChangePassword ? '/premiere-connexion' : '/dashboard');
     } else if (status.blocked) {
       setLockSeconds(status.retryAfterSeconds || LOCKOUT_MINUTES * 60);
       setError('Trop de tentatives échouées. Compte temporairement bloqué.');

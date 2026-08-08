@@ -2,9 +2,10 @@
 Options -MultiViews
 RewriteEngine On
 
-# Force HTTPS (optionnel, décommentez si SSL activé)
-# RewriteCond %{HTTPS} off
-# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Force HTTPS/TLS (redirection permanente)
+RewriteCond %{HTTPS} !=on
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
 # Ne pas réécrire les fichiers/dossiers existants
 RewriteCond %{REQUEST_FILENAME} -f [OR]
@@ -48,6 +49,10 @@ RewriteRule ^ index.html [L]
   Header set X-Content-Type-Options "nosniff"
   Header set X-Frame-Options "SAMEORIGIN"
   Header set Referrer-Policy "strict-origin-when-cross-origin"
+  # HSTS : impose HTTPS pendant 1 an (activez le SSL LWS avant)
+  Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+  Header set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header set Cross-Origin-Opener-Policy "same-origin"
 </IfModule>
 
 # Page 404 -> SPA
