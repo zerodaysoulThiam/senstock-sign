@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
-import { saveDocument } from '@/lib/documents';
+import { registerSignedDocument, getSignedUrl } from '@/lib/documents';
 import { signPDF, type SignaturePosition } from '@/lib/pdf-signer';
 import AppHeader from '@/components/AppHeader';
 import PdfStampPlacer, { type PlacementResult } from '@/components/PdfStampPlacer';
@@ -193,33 +193,43 @@ export default function SignDocument() {
       const fileName = `signé_${pdfFile.name}`;
       setSignedFileName(fileName);
 
+      let proof: Awaited<ReturnType<typeof registerSignedDocument>> | null = null;
       try {
-        await saveDocument({
+        proof = await registerSignedDocument({
+          blob,
           fileName: pdfFile.name,
-          signedBy: user.email,
-          signedByName: signerName,
-          signedAt: new Date().toISOString(),
-          signaturePosition: position,
+          position,
           pageCount,
-        }, blob);
+          device: detectDevice(),
+        });
+        // Le PDF final (avec signature cryptographique) est celui du cloud.
+        if (proof.cryptoSigned) {
+          try {
+            const url = await getSignedUrl(proof.storagePath, fileName);
+            setSignedPdfUrl(url);
+          } catch (e) { console.error('signed url', e); }
+        }
       } catch (e: any) {
-        console.error('saveDocument failed', e);
-        toast.error(e?.message || "Document signé mais non sauvegardé dans le cloud", { duration: 8000 });
+        console.error('registerSignedDocument failed', e);
+        toast.error(e?.message || "Document signé mais dossier de preuve non enregistré", { duration: 8000 });
       }
 
-      const nowIso = new Date().toISOString();
+      const nowIso = proof?.signedAt ?? new Date().toISOString();
       const seed = `${user.email}|${pdfFile.name}|${nowIso}`;
       const pagesLabel = position === 'all' ? 'Toutes les pages' : position === 'first' ? 'Première' : position === 'last' ? 'Dernière' : 'Page du milieu';
       setReceipt({
-        signatureId: makeSignatureId(seed),
+        signatureId: proof?.signatureId ?? makeSignatureId(seed),
         signerName,
         signerEmail: user.email,
         signedAt: nowIso,
         device: detectDevice(),
-        ipOrSession: makeSessionFingerprint(seed),
-        method: 'Signature électronique avec cachet',
+        ipOrSession: proof?.ip && proof.ip !== 'unknown' ? proof.ip : makeSessionFingerprint(seed),
+        method: proof?.authMethod ?? 'Signature électronique avec cachet',
         fileName: pdfFile.name,
         pagesSigned: pagesLabel,
+        sha256: proof?.sha256 ?? null,
+        cryptoSigned: proof?.cryptoSigned,
+        certSubject: proof?.certSubject ?? null,
       });
 
       setStep('done');
