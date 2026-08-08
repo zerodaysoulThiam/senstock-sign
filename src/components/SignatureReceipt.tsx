@@ -72,18 +72,23 @@ export function pagesLabelFor(position: string): string {
 export function receiptFromDoc(doc: {
   id: string; fileName: string; signedBy: string; signedByName: string;
   signedAt: string; signaturePosition: string;
+  sha256?: string | null; signatureId?: string | null; authMethod?: string | null;
+  signerIp?: string | null; cryptoSigned?: boolean; certSubject?: string | null;
 }): SignatureReceiptData {
   const seed = `${doc.signedBy}|${doc.fileName}|${doc.signedAt}|${doc.id}`;
   return {
-    signatureId: makeSignatureId(seed),
+    signatureId: doc.signatureId ?? makeSignatureId(seed),
     signerName: doc.signedByName,
     signerEmail: doc.signedBy,
     signedAt: doc.signedAt,
     device: detectDevice(),
-    ipOrSession: makeSessionFingerprint(seed),
-    method: 'Signature électronique avec cachet',
+    ipOrSession: doc.signerIp && doc.signerIp !== 'unknown' ? doc.signerIp : makeSessionFingerprint(seed),
+    method: doc.authMethod ?? 'Signature électronique avec cachet',
     fileName: doc.fileName,
     pagesSigned: pagesLabelFor(doc.signaturePosition),
+    sha256: doc.sha256 ?? null,
+    cryptoSigned: doc.cryptoSigned,
+    certSubject: doc.certSubject ?? null,
   };
 }
 
