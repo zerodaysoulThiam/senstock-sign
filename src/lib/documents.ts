@@ -10,6 +10,13 @@ export interface SignedDocument {
   signaturePosition: string;
   pageCount: number;
   storagePath?: string | null;
+  sha256?: string | null;
+  signatureId?: string | null;
+  authMethod?: string | null;
+  signerIp?: string | null;
+  cryptoSigned?: boolean;
+  certSubject?: string | null;
+  auditTrail?: any[];
 }
 
 async function fetchOwnersMap(ownerIds: string[]): Promise<Record<string, string>> {
@@ -32,13 +39,20 @@ function rowToDoc(row: any, emailByOwner: Record<string, string>): SignedDocumen
     signaturePosition: row.placement?.position ?? "-",
     pageCount: row.placement?.pageCount ?? 0,
     storagePath: row.storage_path ?? null,
+    sha256: row.sha256 ?? null,
+    signatureId: row.signature_id ?? null,
+    authMethod: row.auth_method ?? null,
+    signerIp: row.signer_ip ?? null,
+    cryptoSigned: row.crypto_signed ?? false,
+    certSubject: row.cert_subject ?? null,
+    auditTrail: Array.isArray(row.audit_trail) ? row.audit_trail : [],
   };
 }
 
 export async function getDocuments(email?: string): Promise<SignedDocument[]> {
   let query = supabase
     .from("documents")
-    .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail, storage_path")
+    .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail, storage_path, sha256, signature_id, auth_method, signer_ip, crypto_signed, cert_subject")
     .order("created_at", { ascending: false });
   if (email) {
     const { data: prof } = await supabase.from("profiles").select("id").eq("email", email.toLowerCase()).maybeSingle();
