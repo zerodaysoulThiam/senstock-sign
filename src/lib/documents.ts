@@ -151,3 +151,71 @@ export async function getStats() {
     topSigner: Object.entries(byUser).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A",
   };
 }
+
+export interface SignatureProof {
+  id: string;
+  signatureId: string;
+  sha256: string;
+  signedAt: string;
+  ip: string;
+  authMethod: string;
+  cryptoSigned: boolean;
+  certSerial: string | null;
+  certSubject: string | null;
+  storagePath: string;
+  signerName: string;
+}
+
+/**
+ * Envoie le PDF cacheté au cloud, y applique la signature cryptographique
+ * (PAdES) côté serveur, puis enregistre le dossier de preuve.
+ * Le hash et l'IP sont calculés par le serveur : ils ne sont pas falsifiables.
+ */
+export async function registerSignedDocument(params: {
+  blob: Blob;
+  fileName: string;
+  position: string;
+  pageCount: number;
+  device?: string;
+}): Promise<SignatureProof> {
+  const user = getCurrentUser();
+  if (!user) throw new Error("Non authentifié");
+  const safeName = params.fileName.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 120);
+  const path = `${user.id}/${Date.now()}_${safeName}`;
+
+  let uploadError: string | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { error } = await supabase.storage
+      .from("signed-documents")
+      .upload(path, params.blob, { contentType: "application/pdf", upsert: true });
+    if (!error) { uploadError = null; break; }
+    uploadError = error.message;
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+  }
+  if (uploadError) {
+    const sizeMb = (params.blob.size / (1024 * 1024)).toFixed(1);
+    throw new Error(`L'envoi du fichier (${sizeMb} Mo) au cloud a échoué : ${uploadError}`);
+  }
+
+  const { data, error } = await supabase.functions.invoke("crypto-sign", {
+    body: {
+      storagePath: path,
+      fileName: params.fileName,
+      position: params.position,
+      pageCount: params.pageCount,
+      device: params.device ?? "",
+    },
+  });
+  if (error) throw error;
+  if ((data as any)?.error) throw new Error((data as any).error);
+  return data as SignatureProof;
+}
+
+/** URL signée temporaire pour lire/télécharger un document du cloud. */
+export async function getSignedUrl(storagePath: string, downloadName?: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("signed-documents")
+    .createSignedUrl(storagePath, 600, downloadName ? { download: downloadName } : undefined);
+  if (error || !data?.signedUrl) throw error ?? new Error("URL indisponible");
+  return data.signedUrl;
+}
