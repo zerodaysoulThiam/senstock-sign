@@ -22,8 +22,11 @@ export type Database = {
           cert_subject: string | null
           created_at: string
           crypto_signed: boolean
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           name: string
+          original_owner_email: string | null
           owner_id: string
           pdf_data: string | null
           placement: Json | null
@@ -43,8 +46,11 @@ export type Database = {
           cert_subject?: string | null
           created_at?: string
           crypto_signed?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           name: string
+          original_owner_email?: string | null
           owner_id: string
           pdf_data?: string | null
           placement?: Json | null
@@ -64,8 +70,11 @@ export type Database = {
           cert_subject?: string | null
           created_at?: string
           crypto_signed?: boolean
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           name?: string
+          original_owner_email?: string | null
           owner_id?: string
           pdf_data?: string | null
           placement?: Json | null

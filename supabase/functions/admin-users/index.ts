@@ -111,17 +111,27 @@ async function isCallerAdmin(authHeader: string | null): Promise<{ ok: boolean; 
   return { ok: isAdmin, userId: data.user.id };
 }
 
-/** Removes a user's documents, stored files, profile, roles and auth account. */
-async function deleteUserCascade(userId: string) {
-  const { data: docs } = await admin
+/**
+ * Supprime le compte SANS jamais détruire ses documents signés :
+ * les documents (et leurs fichiers) sont transférés à l'administrateur
+ * qui effectue l'action et marqués comme archivés.
+ */
+async function deleteUserCascade(userId: string, archiveOwnerId: string) {
+  const { data: prof } = await admin
+    .from("profiles")
+    .select("email")
+    .eq("id", userId)
+    .maybeSingle();
+  // Archivage : aucun fichier de stockage n'est supprimé.
+  await admin
     .from("documents")
-    .select("id, storage_path")
+    .update({
+      owner_id: archiveOwnerId,
+      deleted_at: new Date().toISOString(),
+      deleted_by: archiveOwnerId,
+      original_owner_email: prof?.email ?? null,
+    })
     .eq("owner_id", userId);
-  const paths = (docs ?? []).map((d: any) => d.storage_path).filter(Boolean);
-  if (paths.length > 0) {
-    await admin.storage.from("signed-documents").remove(paths);
-  }
-  await admin.from("documents").delete().eq("owner_id", userId);
   await admin.from("user_roles").delete().eq("user_id", userId);
   await admin.from("profiles").delete().eq("id", userId);
   const { error } = await admin.auth.admin.deleteUser(userId);
@@ -279,7 +289,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      await deleteUserCascade(userId);
+      await deleteUserCascade(userId, check.userId!);
       return new Response(JSON.stringify({ ok: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -295,7 +305,7 @@ Deno.serve(async (req) => {
       for (const p of profiles ?? []) {
         if (adminIds.has(p.id)) continue;
         try {
-          await deleteUserCascade(p.id);
+          await deleteUserCascade(p.id, check.userId!);
           deleted++;
         } catch (e) {
           console.error("purge failed", p.id, e);

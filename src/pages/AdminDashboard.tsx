@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUsers, extractName, addUser, toggleUserActive, setUserPassword, deleteUser, purgeNonAdminUsers, type User } from '@/lib/auth';
-import { getDocuments, getStats, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
+import { getDocuments, getStats, downloadSignedDocument, getArchivedDocuments, archiveDocument, restoreDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature, Trash2, KeyRound } from 'lucide-react';
+import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature, Trash2, KeyRound, Archive, RotateCcw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
@@ -17,7 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PasswordPolicyField from '@/components/PasswordPolicyField';
 import { validatePassword } from '@/lib/password';
 
-type Tab = 'documents' | 'users' | 'stats';
+type Tab = 'documents' | 'users' | 'stats' | 'archives';
+
+type ArchivedDoc = SignedDocument & { archivedAt: string; originalOwnerEmail: string | null };
 
 const CHART_COLORS = [
   'hsl(201, 70%, 42%)',
@@ -33,6 +35,7 @@ export default function AdminDashboard() {
   const user = getCurrentUser();
   const [tab, setTab] = useState<Tab>('documents');
   const [docs, setDocs] = useState<SignedDocument[]>([]);
+  const [archived, setArchived] = useState<ArchivedDoc[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<{ total: number; byUser: { name: string; count: number }[]; byMonth: { month: string; count: number }[]; topSigner: string }>({ total: 0, byUser: [], byMonth: [], topSigner: 'N/A' });
 
@@ -50,10 +53,32 @@ export default function AdminDashboard() {
   }, []);
 
   const reload = async () => {
-    const [d, u, s] = await Promise.all([getDocuments(), getUsers(), getStats()]);
+    const [d, u, s, a] = await Promise.all([getDocuments(), getUsers(), getStats(), getArchivedDocuments()]);
     setDocs(d);
     setUsers(u);
     setStats(s);
+    setArchived(a);
+  };
+
+  const handleArchive = async (doc: SignedDocument) => {
+    if (!confirm(`Archiver « ${doc.fileName} » ? Le fichier est conservé et pourra être restauré.`)) return;
+    try {
+      await archiveDocument(doc.id);
+      toast.success('Document archivé (restaurable)');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Archivage impossible");
+    }
+  };
+
+  const handleRestore = async (doc: ArchivedDoc) => {
+    try {
+      await restoreDocument(doc.id);
+      toast.success('Document restauré');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Restauration impossible");
+    }
   };
 
   if (!user || user.role !== 'admin') return null;
@@ -131,6 +156,7 @@ export default function AdminDashboard() {
     { key: 'documents' as Tab, label: 'Documents', icon: FileText, count: docs.length },
     { key: 'users' as Tab, label: 'Utilisateurs', icon: Users, count: users.length },
     { key: 'stats' as Tab, label: 'Statistiques', icon: BarChart3 },
+    { key: 'archives' as Tab, label: 'Archives', icon: Archive, count: archived.length },
   ];
 
   return (
@@ -202,6 +228,58 @@ export default function AdminDashboard() {
                             <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
                               onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
                               <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Archiver (restaurable)" onClick={() => handleArchive(doc)}>
+                              <Archive className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Archives Tab */}
+        {tab === 'archives' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            <div className="bg-accent/40 border rounded-xl p-4 text-sm text-muted-foreground">
+              Aucun document n'est jamais supprimé définitivement : les documents archivés
+              (y compris ceux des comptes supprimés) restent conservés dans le cloud et peuvent être restaurés.
+            </div>
+            {archived.length === 0 ? (
+              <div className="bg-card rounded-xl border p-12 text-center">
+                <Archive className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">Aucun document archivé</p>
+              </div>
+            ) : (
+              <div className="bg-card rounded-xl border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Document</th>
+                      <th className="text-left p-3 font-medium hidden sm:table-cell">Propriétaire d'origine</th>
+                      <th className="text-left p-3 font-medium">Archivé le</th>
+                      <th className="text-right p-3 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archived.map(doc => (
+                      <tr key={doc.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="p-3 font-medium">{doc.fileName}</td>
+                        <td className="p-3 hidden sm:table-cell text-muted-foreground">{doc.originalOwnerEmail ?? doc.signedBy}</td>
+                        <td className="p-3 text-muted-foreground">{new Date(doc.archivedAt).toLocaleString('fr-FR')}</td>
+                        <td className="p-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
+                              onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Restaurer" onClick={() => handleRestore(doc)}>
+                              <RotateCcw className="h-4 w-4" />
                             </Button>
                           </div>
                         </td>
