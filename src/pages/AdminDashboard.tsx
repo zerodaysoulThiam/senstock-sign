@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, getUsers, extractName, addUser, toggleUserActive, setUserPassword, deleteUser, purgeNonAdminUsers, type User } from '@/lib/auth';
-import { getDocuments, getStats, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
+import { getDocuments, getStats, downloadSignedDocument, getArchivedDocuments, archiveDocument, restoreDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature, Trash2, KeyRound } from 'lucide-react';
+import { FileText, Users, BarChart3, UserPlus, Shield, UserX, UserCheck, Download, FileSignature, Trash2, KeyRound, Archive, RotateCcw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'sonner';
@@ -17,7 +17,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import PasswordPolicyField from '@/components/PasswordPolicyField';
 import { validatePassword } from '@/lib/password';
 
-type Tab = 'documents' | 'users' | 'stats';
+type Tab = 'documents' | 'users' | 'stats' | 'archives';
+
+type ArchivedDoc = SignedDocument & { archivedAt: string; originalOwnerEmail: string | null };
 
 const CHART_COLORS = [
   'hsl(201, 70%, 42%)',
@@ -33,6 +35,7 @@ export default function AdminDashboard() {
   const user = getCurrentUser();
   const [tab, setTab] = useState<Tab>('documents');
   const [docs, setDocs] = useState<SignedDocument[]>([]);
+  const [archived, setArchived] = useState<ArchivedDoc[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<{ total: number; byUser: { name: string; count: number }[]; byMonth: { month: string; count: number }[]; topSigner: string }>({ total: 0, byUser: [], byMonth: [], topSigner: 'N/A' });
 
@@ -50,10 +53,32 @@ export default function AdminDashboard() {
   }, []);
 
   const reload = async () => {
-    const [d, u, s] = await Promise.all([getDocuments(), getUsers(), getStats()]);
+    const [d, u, s, a] = await Promise.all([getDocuments(), getUsers(), getStats(), getArchivedDocuments()]);
     setDocs(d);
     setUsers(u);
     setStats(s);
+    setArchived(a);
+  };
+
+  const handleArchive = async (doc: SignedDocument) => {
+    if (!confirm(`Archiver « ${doc.fileName} » ? Le fichier est conservé et pourra être restauré.`)) return;
+    try {
+      await archiveDocument(doc.id);
+      toast.success('Document archivé (restaurable)');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Archivage impossible");
+    }
+  };
+
+  const handleRestore = async (doc: ArchivedDoc) => {
+    try {
+      await restoreDocument(doc.id);
+      toast.success('Document restauré');
+      await reload();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Restauration impossible");
+    }
   };
 
   if (!user || user.role !== 'admin') return null;
@@ -131,6 +156,7 @@ export default function AdminDashboard() {
     { key: 'documents' as Tab, label: 'Documents', icon: FileText, count: docs.length },
     { key: 'users' as Tab, label: 'Utilisateurs', icon: Users, count: users.length },
     { key: 'stats' as Tab, label: 'Statistiques', icon: BarChart3 },
+    { key: 'archives' as Tab, label: 'Archives', icon: Archive, count: archived.length },
   ];
 
   return (
