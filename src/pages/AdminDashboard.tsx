@@ -229,6 +229,58 @@ export default function AdminDashboard() {
                               onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
                               <Download className="h-4 w-4" />
                             </Button>
+                            <Button variant="ghost" size="icon" title="Archiver (restaurable)" onClick={() => handleArchive(doc)}>
+                              <Archive className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Archives Tab */}
+        {tab === 'archives' && (
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+            <div className="bg-accent/40 border rounded-xl p-4 text-sm text-muted-foreground">
+              Aucun document n'est jamais supprimé définitivement : les documents archivés
+              (y compris ceux des comptes supprimés) restent conservés dans le cloud et peuvent être restaurés.
+            </div>
+            {archived.length === 0 ? (
+              <div className="bg-card rounded-xl border p-12 text-center">
+                <Archive className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
+                <p className="text-muted-foreground">Aucun document archivé</p>
+              </div>
+            ) : (
+              <div className="bg-card rounded-xl border overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="text-left p-3 font-medium">Document</th>
+                      <th className="text-left p-3 font-medium hidden sm:table-cell">Propriétaire d'origine</th>
+                      <th className="text-left p-3 font-medium">Archivé le</th>
+                      <th className="text-right p-3 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {archived.map(doc => (
+                      <tr key={doc.id} className="border-b last:border-0 hover:bg-muted/30">
+                        <td className="p-3 font-medium">{doc.fileName}</td>
+                        <td className="p-3 hidden sm:table-cell text-muted-foreground">{doc.originalOwnerEmail ?? doc.signedBy}</td>
+                        <td className="p-3 text-muted-foreground">{new Date(doc.archivedAt).toLocaleString('fr-FR')}</td>
+                        <td className="p-3 text-right">
+                          <div className="inline-flex items-center gap-1">
+                            <Button variant="ghost" size="icon" title="Télécharger" disabled={!doc.storagePath}
+                              onClick={async () => { try { await downloadSignedDocument(doc); } catch (e: any) { toast.error(e?.message || 'Téléchargement impossible'); } }}>
+                              <Download className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" title="Restaurer" onClick={() => handleRestore(doc)}>
+                              <RotateCcw className="h-4 w-4" />
+                            </Button>
                           </div>
                         </td>
                       </tr>
