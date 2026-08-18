@@ -1,34 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCurrentUser, extractName } from '@/lib/auth';
-import { getDocuments, downloadSignedDocument, deleteDocument, deleteDocuments, type SignedDocument } from '@/lib/documents';
+import { getDocuments, downloadSignedDocument, type SignedDocument } from '@/lib/documents';
 import AppHeader from '@/components/AppHeader';
 import { Button } from '@/components/ui/button';
-import { PenTool, FileText, Calendar, Download, Plus, FileSignature, Trash2 } from 'lucide-react';
+import { PenTool, FileText, Calendar, Download, Plus, FileSignature } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import EmailShareMenu from '@/components/EmailShareMenu';
 import SignatureReceipt, { receiptFromDoc } from '@/components/SignatureReceipt';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const user = getCurrentUser();
   const [docs, setDocs] = useState<SignedDocument[]>([]);
   const [receiptDoc, setReceiptDoc] = useState<SignedDocument | null>(null);
-  const [toDelete, setToDelete] = useState<SignedDocument | null>(null);
-  const [purgeOpen, setPurgeOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!user) { navigate('/login'); return; }
@@ -44,35 +31,6 @@ export default function Dashboard() {
       await downloadSignedDocument(doc);
     } catch (e: any) {
       toast.error(e?.message || "Téléchargement impossible");
-    }
-  };
-
-  const confirmDelete = async () => {
-    if (!toDelete) return;
-    setBusy(true);
-    try {
-      await deleteDocument(toDelete);
-      setDocs((prev) => prev.filter((d) => d.id !== toDelete.id));
-      toast.success('Document supprimé');
-    } catch (e: any) {
-      toast.error(e?.message || 'Suppression impossible');
-    } finally {
-      setBusy(false);
-      setToDelete(null);
-    }
-  };
-
-  const confirmPurge = async () => {
-    setBusy(true);
-    try {
-      await deleteDocuments(docs);
-      setDocs([]);
-      toast.success('Tous les documents ont été supprimés');
-    } catch (e: any) {
-      toast.error(e?.message || 'Suppression impossible');
-    } finally {
-      setBusy(false);
-      setPurgeOpen(false);
     }
   };
 
@@ -125,15 +83,7 @@ export default function Dashboard() {
 
         {/* Document History */}
         <div>
-          <div className="flex items-center justify-between mb-4 gap-3">
-            <h2 className="text-lg font-semibold">Historique des signatures</h2>
-            {docs.length > 0 && (
-              <Button variant="outline" size="sm" className="gap-2 text-destructive" onClick={() => setPurgeOpen(true)}>
-                <Trash2 className="h-4 w-4" />
-                Tout supprimer
-              </Button>
-            )}
-          </div>
+          <h2 className="text-lg font-semibold mb-4">Historique des signatures</h2>
           {docs.length === 0 ? (
             <div className="bg-card rounded-xl border p-12 text-center">
               <FileText className="h-12 w-12 text-muted-foreground/40 mx-auto mb-3" />
@@ -172,9 +122,6 @@ export default function Dashboard() {
                     <Button variant="ghost" size="icon" title="Télécharger" onClick={() => handleDownload(doc)} disabled={!doc.storagePath}>
                       <Download className="h-4 w-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" title="Supprimer" className="text-destructive" onClick={() => setToDelete(doc)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
                   </div>
                 </motion.div>
               ))}
@@ -188,36 +135,6 @@ export default function Dashboard() {
           {receiptDoc && <SignatureReceipt data={receiptFromDoc(receiptDoc)} onClose={() => setReceiptDoc(null)} />}
         </DialogContent>
       </Dialog>
-
-      <AlertDialog open={!!toDelete} onOpenChange={(o) => !o && setToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce document ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              « {toDelete?.fileName} » et son fichier signé seront définitivement supprimés du cloud.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} disabled={busy}>Supprimer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={purgeOpen} onOpenChange={setPurgeOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer tous les documents ?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Les {docs.length} documents signés et leurs fichiers seront définitivement supprimés. Cette action est irréversible.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Annuler</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmPurge} disabled={busy}>Tout supprimer</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

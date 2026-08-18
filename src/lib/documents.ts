@@ -152,27 +152,6 @@ export async function getStats() {
   };
 }
 
-/** Supprime un document (fichier cloud + enregistrement). */
-export async function deleteDocument(doc: SignedDocument): Promise<void> {
-  if (doc.storagePath) {
-    await supabase.storage.from("signed-documents").remove([doc.storagePath]);
-  }
-  const { error } = await supabase.from("documents").delete().eq("id", doc.id);
-  if (error) throw error;
-}
-
-/** Supprime plusieurs documents d'un coup. */
-export async function deleteDocuments(docs: SignedDocument[]): Promise<void> {
-  const paths = docs.map((d) => d.storagePath).filter(Boolean) as string[];
-  if (paths.length > 0) {
-    await supabase.storage.from("signed-documents").remove(paths);
-  }
-  const ids = docs.map((d) => d.id);
-  if (ids.length === 0) return;
-  const { error } = await supabase.from("documents").delete().in("id", ids);
-  if (error) throw error;
-}
-
 export interface SignatureProof {
   id: string;
   signatureId: string;
