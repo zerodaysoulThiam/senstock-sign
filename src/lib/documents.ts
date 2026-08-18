@@ -53,6 +53,7 @@ export async function getDocuments(email?: string): Promise<SignedDocument[]> {
   let query = supabase
     .from("documents")
     .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail, storage_path, sha256, signature_id, auth_method, signer_ip, crypto_signed, cert_subject")
+    .is("deleted_at", null)
     .order("created_at", { ascending: false });
   if (email) {
     const { data: prof } = await supabase.from("profiles").select("id").eq("email", email.toLowerCase()).maybeSingle();
@@ -63,6 +64,41 @@ export async function getDocuments(email?: string): Promise<SignedDocument[]> {
   if (error || !data) return [];
   const owners = await fetchOwnersMap(data.map((d: any) => d.owner_id));
   return data.map((d: any) => rowToDoc(d, owners));
+}
+
+/** Documents archivés (jamais supprimés définitivement). */
+export async function getArchivedDocuments(): Promise<(SignedDocument & { archivedAt: string; originalOwnerEmail: string | null })[]> {
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id, owner_id, name, status, placement, signed_at, created_at, audit_trail, storage_path, sha256, signature_id, auth_method, signer_ip, crypto_signed, cert_subject, deleted_at, original_owner_email")
+    .not("deleted_at", "is", null)
+    .order("deleted_at", { ascending: false });
+  if (error || !data) return [];
+  const owners = await fetchOwnersMap(data.map((d: any) => d.owner_id));
+  return data.map((d: any) => ({
+    ...rowToDoc(d, owners),
+    archivedAt: d.deleted_at,
+    originalOwnerEmail: d.original_owner_email ?? null,
+  }));
+}
+
+/** Archive un document (suppression douce : le fichier reste dans le cloud). */
+export async function archiveDocument(id: string): Promise<void> {
+  const user = getCurrentUser();
+  const { error } = await supabase
+    .from("documents")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: user?.id ?? null })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+/** Restaure un document archivé. */
+export async function restoreDocument(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("documents")
+    .update({ deleted_at: null, deleted_by: null })
+    .eq("id", id);
+  if (error) throw error;
 }
 
 export async function saveDocument(doc: Omit<SignedDocument, "id">, pdfBlob?: Blob) {
